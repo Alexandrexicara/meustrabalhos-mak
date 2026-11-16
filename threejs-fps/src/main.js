@@ -200,7 +200,34 @@ loadOptionalWeaponModel('rifle','/assets/weapons/rifle.glb',weapon,{x:.34,y:-.32
 loadOptionalWeaponModel('pistol','/assets/weapons/pistol.glb',pistol,{x:.34,y:-.32,z:-.58});
 loadOptionalWeaponModel('launcher','/assets/weapons/at4.glb',launcher,{x:.34,y:-.3,z:-.78});
 function setWeapon(type){player.weaponType=type;weapon.visible=type==='rifle';pistol.visible=type==='pistol';launcher.visible=type==='launcher';const data={rifle:['VX-9 RANGER','5.56 × 45 MM // ASSAULT RIFLE','01 / PRIMARY','/assets/icons/rifle.svg','/assets/icons/rifle-ammo.svg'],pistol:['M9 SIDEARM','9 × 19 MM // SEMI-AUTO','02 / SIDEARM','/assets/icons/pistol.svg','/assets/icons/pistol-ammo.svg'],launcher:['AT-4 ROCKET','84 MM // ANTI-ARMOR','03 / HEAVY','/assets/icons/at4.svg','/assets/icons/rocket-ammo.svg']}[type];$('weapon-name').textContent=data[0];$('weapon-desc').textContent=data[1];$('weapon-slot').textContent=data[2];$('weapon-image').src=data[3];$('ammo-image').src=data[4];$('weapon-image').alt=data[0];$('ammo-image').alt=data[1];updateHUD();}
-function spawnSupplyPickups(){supplyPickups.length=0;const layout=[['rifle',-24,-8],['rifle',21,12],['pistol',-8,24],['pistol',25,-14],['grenade',-25,18],['grenade',8,-25],['launcher',28,-27],['launcher',-29,-25]];for(const [type,x,z] of layout){const g=new THREE.Group();g.position.set(x,.18,z);const color={rifle:0x80633d,pistol:0x6d755d,grenade:0x526b3d,launcher:0x58634b}[type];const crate=new THREE.Mesh(new THREE.BoxGeometry(1.15,.58,.9),mat(color,.8,.12));crate.castShadow=true;g.add(crate);const band=new THREE.Mesh(new THREE.BoxGeometry(1.18,.09,.94),mat(type==='launcher'?0xd18b36:0xc0ad78));band.position.y=.12;g.add(band);const halo=new THREE.Mesh(new THREE.TorusGeometry(.78,.045,8,24),new THREE.MeshBasicMaterial({color:type==='launcher'?0xffa34a:type==='grenade'?0x9be36e:0x8ed0a0}));halo.rotation.x=Math.PI/2;halo.position.y=.36;g.add(halo);world.add(g);supplyPickups.push({g,type,x,z});}}
+const supplyArtCache=new Map();
+const supplyArtPaths={rifle:'/assets/icons/rifle-ammo.svg',pistol:'/assets/icons/pistol-ammo.svg',grenade:'/assets/icons/grenade-ammo.svg',launcher:'/assets/icons/at4.svg'};
+const supplyLabels={rifle:'MUNICAO DE FUZIL  +60',pistol:'MUNICAO DE PISTOLA  +24',grenade:'GRANADAS  +2',launcher:'LANCADOR AT-4  /  1 FOGUETE'};
+function makeSupplyLabel(type){
+ const canvas=document.createElement('canvas');canvas.width=512;canvas.height=96;const ctx=canvas.getContext('2d');
+ ctx.fillStyle='rgba(5,12,15,.94)';ctx.fillRect(0,0,512,96);ctx.strokeStyle=type==='launcher'?'#ffad55':'#b8e78c';ctx.lineWidth=5;ctx.strokeRect(3,3,506,90);
+ ctx.fillStyle='#eaf3e7';ctx.font='bold 29px Arial';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(supplyLabels[type],256,49);
+ const texture=new THREE.CanvasTexture(canvas);texture.colorSpace=THREE.SRGBColorSpace;return texture;
+}
+function supplyIconTexture(type){
+ if(supplyArtCache.has(type))return supplyArtCache.get(type);
+ const texture=new THREE.TextureLoader().load(supplyArtPaths[type]);texture.colorSpace=THREE.SRGBColorSpace;supplyArtCache.set(type,texture);return texture;
+}
+function spawnSupplyPickups(){
+ supplyPickups.length=0;
+ const layout=[['rifle',-24,-8],['rifle',21,12],['pistol',-8,24],['pistol',25,-14],['grenade',-25,18],['grenade',8,-25],['launcher',28,-27],['launcher',-29,-25]];
+ for(const [type,x,z] of layout){
+  const g=new THREE.Group();g.position.set(x,.18,z);
+  const color={rifle:0x80633d,pistol:0x6d755d,grenade:0x526b3d,launcher:0x58634b}[type];
+  const crate=new THREE.Mesh(new THREE.BoxGeometry(1.35,.64,1.05),mat(color,.8,.12));crate.castShadow=true;crate.receiveShadow=true;g.add(crate);
+  const lid=new THREE.Mesh(new THREE.BoxGeometry(1.39,.11,1.09),mat(type==='launcher'?0xd18b36:0xc0ad78));lid.position.y=.34;g.add(lid);
+  for(let side=-1;side<=1;side+=2){const strap=new THREE.Mesh(new THREE.BoxGeometry(.12,.67,1.08),mat(0x252b26,.9,.08));strap.position.x=side*.43;g.add(strap);}
+  const halo=new THREE.Mesh(new THREE.TorusGeometry(.86,.045,8,32),new THREE.MeshBasicMaterial({color:type==='launcher'?0xffa34a:type==='grenade'?0x9be36e:0x8ed0a0}));halo.rotation.x=Math.PI/2;halo.position.y=.4;g.add(halo);
+  const icon=new THREE.Sprite(new THREE.SpriteMaterial({map:supplyIconTexture(type),transparent:true,depthWrite:false,alphaTest:.08}));icon.name='supply-item-art';icon.position.set(0,1.22,0);icon.scale.set(type==='launcher'?1.45:.98,type==='launcher'?.48:.58,1);g.add(icon);
+  const label=new THREE.Sprite(new THREE.SpriteMaterial({map:makeSupplyLabel(type),transparent:true,depthWrite:false}));label.name='supply-item-label';label.position.set(0,.72,0);label.scale.set(1.9,.36,1);g.add(label);
+  world.add(g);supplyPickups.push({g,type,x,z,icon,label,baseY:1.22,phase:Math.random()*Math.PI*2});
+ }
+}
 function collectSupplyPickups(){for(let i=supplyPickups.length-1;i>=0;i--){const p=supplyPickups[i];if(Math.hypot(camera.position.x-p.x,camera.position.z-p.z)>2.25)continue;let message='';if(p.type==='rifle'){player.reserve+=60;message='CAIXA DE FUZIL // +60 CARTUCHOS';}else if(p.type==='pistol'){player.pistolReserve+=24;message='CAIXA DE PISTOLA // +24 CARTUCHOS';}else if(p.type==='grenade'){const before=player.grenades;player.grenades=Math.min(5,player.grenades+2);message=player.grenades>before?'GRANADAS RECOLHIDAS // +'+(player.grenades-before):'BOLSAS DE GRANADA JÁ ESTÃO CHEIAS';}else{if(player.rocketAmmo>0){toast('LANÇA-FOGUETES JÁ CARREGADO // USE ANTES DE PEGAR OUTRO');continue;}player.rocketAmmo=1;setWeapon('launcher');message='AT-4 RECOLHIDO // 1 FOGUETE';}world.remove(p.g);supplyPickups.splice(i,1);toast(message);updateHUD();}}
 
 const player={health:100,ammo:30,reserve:120,pistolAmmo:12,pistolReserve:48,rocketAmmo:0,weaponType:'rifle',grenades:3,kills:0,shots:0,hits:0,round:1,reloading:false,alive:true,active:true,velocity:new THREE.Vector3(),onGround:true};
@@ -601,7 +628,7 @@ function update(dt){
   if(player.onGround){camera.position.y=THREE.MathUtils.damp(camera.position.y,eyeHeight,18,dt);if(Math.abs(camera.position.y-eyeHeight)<.015)camera.position.y=eyeHeight;}
   else{camera.position.y+=player.velocity.y*dt;if(camera.position.y<=eyeHeight){camera.position.y=eyeHeight;player.velocity.y=0;player.onGround=true;}}
   weapon.position.y=Math.sin(bob*1.7)*.012-recoil*.5+(crouched?-.22:0);weapon.position.x=Math.cos(bob*.85)*.008;weapon.rotation.x=-recoil+(crouched?.035:0);
-  updateBots(dt);updateProjectiles(dt);collectSupplyPickups();updateMission(dt);updateCampaignRoute(dt);
+  updateBots(dt);updateProjectiles(dt);for(const p of supplyPickups){p.phase+=dt*1.8;p.icon.position.y=p.baseY+Math.sin(p.phase)*.09;p.label.position.y=.72+Math.sin(p.phase)*.09;}collectSupplyPickups();updateMission(dt);updateCampaignRoute(dt);
   if(Math.floor(elapsed*3)%2===0)updateRadar();
  }
  $('clock').textContent=String(Math.floor(elapsed/60)).padStart(2,'0')+':'+String(Math.floor(elapsed%60)).padStart(2,'0');

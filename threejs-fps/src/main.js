@@ -463,7 +463,7 @@ function updateBots(dt){
   if(!b.alerted){
    // Detection is based on actual line of sight or close proximity, never a broad distance trigger.
    let enemySeesPlayer=false,playerSeesEnemy=false;
-   if(dist<34){
+   if(dist<22){
     const eye=p.clone().add(new THREE.Vector3(0,1.48,0));
     const toPlayer=camera.position.clone().sub(eye),sightDistance=toPlayer.length();
     raycaster.set(eye,toPlayer.clone().normalize());raycaster.far=sightDistance;
@@ -506,7 +506,7 @@ function updateBots(dt){
   }
   // Keep the torso, rifle and muzzle aimed at the player's current position.
   b.group.rotation.y=Math.atan2(dx,dz);
-  if(moved)setBotAnimation(b,'walk');else setBotAnimation(b,'idle');
+  setBotAnimation(b,'idle');
   b.group.scale.y=1;
   fireBot(b,dt);
  }

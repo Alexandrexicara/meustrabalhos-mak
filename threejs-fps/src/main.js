@@ -117,7 +117,8 @@ const muzzleFlash=new THREE.Mesh(new THREE.SphereGeometry(.1,8,8),new THREE.Mesh
 weapon.position.set(0,0,0);
 
 const player={health:100,ammo:30,reserve:120,kills:0,shots:0,hits:0,round:1,reloading:false,alive:true,active:true,velocity:new THREE.Vector3(),onGround:true};
-const bots=[]; const bullets=[]; const clock=new THREE.Clock(); const raycaster=new THREE.Raycaster();
+const bots=[]; const bullets=[]; const clock=new THREE.Clock();
+let missionMarker=null,missionKind='eliminate',missionProgress=0,missionDuration=0,missionX=0,missionZ=-8,missionDone=false; const raycaster=new THREE.Raycaster();
 const keys={}; let pointerLocked=false, elapsed=0, roundTime=120, recoil=0, bob=0, shotCooldown=0, toastTimeout;
 const $=id=>document.getElementById(id);
 const startScreen=$('start-screen'),pauseScreen=$('pause-screen'),roundScreen=$('round-screen'),gameoverScreen=$('gameover-screen');
@@ -204,7 +205,39 @@ function makeBot(index){
  scene.add(group);const bot={group,hp,hpbg,health:100,maxHealth:100,fire:rand(2.2,4.5),speed:rand(1.2,2),strafe:rand(-1,1),alive:true,hitFlash:0,mixer:null};bots.push(bot);
  if(soldierTemplate)attachSoldier(bot);return bot;
 }
-function spawnWave(){buildMap(player.round);for(const b of bots){scene.remove(b.group)}bots.length=0;const count=Math.min(4+player.round*2,14);for(let i=0;i<count;i++)makeBot(i);$('wave').textContent=String(count).padStart(2,'0');$('radar-count').textContent=String(count).padStart(2,'0');$('round-label').textContent='ROUND '+String(player.round).padStart(2,'0');$('objective-sub').textContent=count+' hostile signatures detected';roundTime=Math.max(55,120-player.round*4);updateTimer();}
+function spawnWave(){
+ buildMap(player.round);for(const b of bots)scene.remove(b.group);bots.length=0;
+ const count=Math.min(4+player.round*2,14);for(let i=0;i<count;i++)makeBot(i);
+ $('wave').textContent=String(count).padStart(2,'0');$('radar-count').textContent=String(count).padStart(2,'0');
+ $('round-label').textContent='ROUND '+String(player.round).padStart(2,'0');
+ const missions=[
+  {kind:'eliminate',title:'ELIMINATE HOSTILE FORCES',sub:'Neutralize every hostile in the urban sector',duration:0},
+  {kind:'intel',title:'SECURE THE INTEL CACHE',sub:'Clear hostiles, then hold the marked intel zone',duration:8},
+  {kind:'defend',title:'DEFEND THE EXTRACTION ZONE',sub:'Clear hostiles and hold the extraction perimeter',duration:25},
+  {kind:'sabotage',title:'SABOTAGE THE DEPOT',sub:'Clear hostiles, then secure the marked depot',duration:10}
+ ];
+ const mission=missions[(player.round-1)%missions.length];missionKind=mission.kind;missionDuration=mission.duration;missionProgress=0;missionDone=mission.kind==='eliminate';
+ $('objective').textContent=mission.title;$('objective-sub').textContent=mission.sub;$('match-state').textContent=mapThemes[currentMap].name;
+ if(missionMarker){scene.remove(missionMarker);missionMarker=null;}
+ if(missionKind!=='eliminate'){
+  missionMarker=new THREE.Group();missionMarker.position.set(missionX,0,missionZ);
+  const color=missionKind==='defend'?0x59c7ff:0xc5f36b;
+  const ring=new THREE.Mesh(new THREE.TorusGeometry(2.5,.09,8,48),new THREE.MeshBasicMaterial({color}));ring.rotation.x=-Math.PI/2;ring.position.y=.08;missionMarker.add(ring);
+  const beam=new THREE.Mesh(new THREE.CylinderGeometry(.08,.55,4.5,16,1,true),new THREE.MeshBasicMaterial({color,transparent:true,opacity:.16,side:THREE.DoubleSide,depthWrite:false}));beam.position.y=2.25;missionMarker.add(beam);
+  const beacon=new THREE.PointLight(color,2.2,9);beacon.position.y=2;missionMarker.add(beacon);scene.add(missionMarker);
+ }
+ roundTime=Math.max(55,120-player.round*4);updateTimer();
+}
+function updateMission(dt){
+ if(missionDone||missionKind==='eliminate')return;
+ const dx=camera.position.x-missionX,dz=camera.position.z-missionZ;
+ const radius=missionKind==='defend'?7.5:3.2,inside=dx*dx+dz*dz<=radius*radius;
+ if(inside){missionProgress=Math.min(missionDuration,missionProgress+dt);if(missionMarker)missionMarker.rotation.y+=dt*.7;}
+ else if(missionKind==='defend')missionProgress=Math.max(0,missionProgress-dt*.55);
+ const pct=Math.floor(missionProgress/missionDuration*100);
+ $('objective-sub').textContent=(inside?'ZONE SECURED // ':'MOVE TO MARKER // ')+pct+'%';
+ if(missionProgress>=missionDuration){missionDone=true;toast('OBJECTIVE COMPLETE // EXTRACT');$('objective-sub').textContent='OBJECTIVE COMPLETE // SECTOR CLEAR';}
+}
 function updateTimer(){const m=Math.floor(roundTime/60),s=Math.floor(roundTime%60);$('round-timer').textContent=String(m).padStart(2,'0')+':'+String(s).padStart(2,'0');}
 function updateHUD(){
  $('health').textContent=Math.max(0,Math.ceil(player.health));$('health-fill').style.width=Math.max(0,player.health)+'%';$('ammo').textContent=String(player.ammo).padStart(2,'0');$('reserve').textContent=player.reserve;$('kills').textContent=String(player.kills).padStart(2,'0');$('accuracy').textContent=(player.shots?Math.round(player.hits/player.shots*100):100)+'%';
@@ -251,8 +284,8 @@ function update(dt){
   if(move.lengthSq()>0){if(elapsed-lastStepSound>.38){playSound('step');lastStepSound=elapsed;}move.normalize();const speed=(keys.ShiftLeft||keys.ShiftRight)?8.5:5.2;const nx=camera.position.x+move.x*speed*dt,nz=camera.position.z+move.z*speed*dt;if(!moveBlocked(nx,camera.position.z))camera.position.x=nx;if(!moveBlocked(camera.position.x,nz))camera.position.z=nz;bob+=dt*speed;}
   if(keys.Space&&player.onGround){player.velocity.y=5.1;player.onGround=false;}player.velocity.y-=14*dt;camera.position.y+=player.velocity.y*dt;if(camera.position.y<=1.72){camera.position.y=1.72;player.velocity.y=0;player.onGround=true;}
   weapon.position.y=Math.sin(bob*1.7)*.012-recoil*.5;weapon.position.x=Math.cos(bob*.85)*.008;weapon.rotation.x=-recoil;
-  updateBots(dt);
-  if(bots.every(b=>!b.alive)){playSound('round');player.active=false;document.exitPointerLock?.();$('round-eyebrow').textContent='SECTOR SECURED';$('round-title').textContent='ROUND COMPLETE';$('round-copy').textContent=player.kills+' hostile units neutralized. Prepare for the next wave.';roundScreen.classList.remove('hidden');}
+  updateBots(dt);updateMission(dt);
+  if(bots.every(b=>!b.alive)&&missionDone){playSound('round');player.active=false;document.exitPointerLock?.();$('round-eyebrow').textContent='SECTOR SECURED';$('round-title').textContent='ROUND COMPLETE';$('round-copy').textContent=mapThemes[currentMap].name+' secured. '+player.kills+' hostile units neutralized. Next operation changes the battlefield and mission.';roundScreen.classList.remove('hidden');}
   if(Math.floor(elapsed*3)%2===0)updateRadar();
  }
  $('clock').textContent=String(Math.floor(elapsed/60)).padStart(2,'0')+':'+String(Math.floor(elapsed%60)).padStart(2,'0');

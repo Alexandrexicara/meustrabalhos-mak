@@ -7,10 +7,12 @@ scene.background = new THREE.Color(0x89999a);
 scene.fog = new THREE.Fog(0x89999a, 22, 78);
 const camera = new THREE.PerspectiveCamera(76, innerWidth / innerHeight, 0.1, 120);
 camera.position.set(0, 1.72, 8);
-const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
-renderer.setPixelRatio(Math.min(devicePixelRatio, 1.7));
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: false, alpha: false, powerPreference: 'low-power', failIfMajorPerformanceCaveat: false });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.15));
+renderer.setSize(Math.floor(innerWidth * Math.min(window.devicePixelRatio || 1, 1.15)), Math.floor(innerHeight * Math.min(window.devicePixelRatio || 1, 1.15)), false);
+renderer.domElement.style.width = '100%'; renderer.domElement.style.height = '100%';
 renderer.setSize(innerWidth, innerHeight);
-renderer.shadowMap.enabled = true;
+renderer.shadowMap.enabled = false;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
@@ -18,8 +20,8 @@ renderer.toneMappingExposure = 1.12;
 
 scene.add(new THREE.HemisphereLight(0xc9e2e4, 0x303a35, 2.0));
 const sun = new THREE.DirectionalLight(0xffe4bd, 2.8);
-sun.position.set(-12, 24, 10); sun.castShadow = true;
-sun.shadow.mapSize.set(2048, 2048); sun.shadow.camera.left = -35; sun.shadow.camera.right = 35; sun.shadow.camera.top = 35; sun.shadow.camera.bottom = -35;
+sun.position.set(-12, 24, 10); sun.castShadow = false;
+
 scene.add(sun);
 
 const mat = (color, roughness = .85, metalness = 0) => new THREE.MeshStandardMaterial({ color, roughness, metalness });
@@ -29,7 +31,7 @@ const grid = new THREE.GridHelper(100,50,0x7e8a7b,0x89917e); grid.position.y=-.0
 
 const colliders = [];
 function box(x,y,z,sx,sy,sz,material,collide=true){
- const m=new THREE.Mesh(new THREE.BoxGeometry(sx,sy,sz),material); m.position.set(x,y,z); m.castShadow=true; m.receiveShadow=true; scene.add(m);
+ const m=new THREE.Mesh(new THREE.BoxGeometry(sx,sy,sz),material); m.position.set(x,y,z); m.castShadow=false; m.receiveShadow=false; scene.add(m);
  if(collide) colliders.push({x,z,hx:sx/2,hz:sz/2,top:y+sy/2});
  return m;
 }
@@ -103,7 +105,10 @@ canvas.addEventListener('click',()=>{if(!pointerLocked&&player.active&&player.al
 document.addEventListener('pointerlockchange',()=>{pointerLocked=document.pointerLockElement===canvas;if(!pointerLocked&&player.active&&player.alive&&!startScreen.classList.contains('hidden'))return;if(!pointerLocked&&player.active&&player.alive){pauseScreen.classList.remove('hidden');}else{pauseScreen.classList.add('hidden');}});
 document.addEventListener('mousemove',e=>{if(!pointerLocked||!player.active)return;camera.rotation.order='YXZ';camera.rotation.y-=e.movementX*.0022;camera.rotation.x-=e.movementY*.0022;camera.rotation.x=THREE.MathUtils.clamp(camera.rotation.x,-1.35,1.35);});
 document.addEventListener('mousedown',e=>{if(e.button===0)shoot();});document.addEventListener('keydown',e=>{keys[e.code]=true;if(e.code==='KeyR')reload();if(e.code==='Escape'&&pointerLocked){};});document.addEventListener('keyup',e=>keys[e.code]=false);
-window.addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight);renderer.setPixelRatio(Math.min(devicePixelRatio,1.7));});
+window.addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();const ratio=Math.min(window.devicePixelRatio||1,1.15);renderer.setPixelRatio(ratio);renderer.setSize(Math.floor(innerWidth*ratio),Math.floor(innerHeight*ratio),false);});
+let contextLost=false;
+canvas.addEventListener('webglcontextlost',event=>{event.preventDefault();contextLost=true;player.active=false;pauseScreen.classList.add('hidden');toast('GRAPHICS PAUSED // RESTORING WEBGL');});
+canvas.addEventListener('webglcontextrestored',()=>{contextLost=false;renderer.setSize(Math.floor(innerWidth*Math.min(window.devicePixelRatio||1,1.15)),Math.floor(innerHeight*Math.min(window.devicePixelRatio||1,1.15)),false);toast('GRAPHICS RESTORED // CLICK DEPLOY TO RESUME');});
 function updateBots(dt){
  for(const b of bots){if(!b.alive)continue;const p=b.group.position;const toPlayer=new THREE.Vector3(camera.position.x-p.x,0,camera.position.z-p.z);const dist=toPlayer.length();if(dist>5){toPlayer.normalize();const side=new THREE.Vector3(-toPlayer.z,0,toPlayer.x).multiplyScalar(Math.sin(elapsed*1.3+b.group.id)*.38);const move=toPlayer.multiplyScalar(b.speed*dt).add(side.multiplyScalar(dt));const nx=p.x+move.x,nz=p.z+move.z;if(!moveBlocked(nx,p.z))p.x=nx;if(!moveBlocked(p.x,nz))p.z=nz;}b.group.lookAt(camera.position.x,0,camera.position.z);fireBot(b,dt);}
 }
@@ -123,5 +128,5 @@ function update(dt){
  }
  $('clock').textContent=String(Math.floor(elapsed/60)).padStart(2,'0')+':'+String(Math.floor(elapsed%60)).padStart(2,'0');
 }
-function animate(){requestAnimationFrame(animate);const dt=Math.min(clock.getDelta(),.04);update(dt);renderer.render(scene,camera);}
+function animate(){requestAnimationFrame(animate);if(contextLost)return;const dt=Math.min(clock.getDelta(),.04);update(dt);try{renderer.render(scene,camera);}catch(error){console.error('Render failed:',error);}}
 spawnWave();updateHUD();animate();

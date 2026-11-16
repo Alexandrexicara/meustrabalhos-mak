@@ -233,7 +233,7 @@ function makeBot(index){
  const rifleStock=new THREE.Mesh(new THREE.BoxGeometry(.1,.11,.24),cloth);rifleStock.position.z=-.31;rifle.add(rifleStock);
  const rifleMag=new THREE.Mesh(new THREE.CylinderGeometry(.035,.045,.2,8),vestMat);rifleMag.position.set(0,-.14,.12);rifleMag.rotation.x=-.12;rifle.add(rifleMag);
  // Raise both arms toward the rifle instead of leaving the soldier in a walking-at-ease pose.
- for(const arm of fallback.children.filter(o=>o.geometry?.type==='CapsuleGeometry'&&o.position.y>1)){arm.position.y=1.22;arm.position.z=.16;arm.rotation.x=-.82;}
+ for(const arm of fallback.children.filter(o=>o.geometry?.type==='CapsuleGeometry'&&o.position.y>1)){arm.position.y=1.22;arm.position.z=.16;arm.rotation.x=.82;}
  const hpbg=new THREE.Mesh(new THREE.PlaneGeometry(.72,.07),new THREE.MeshBasicMaterial({color:0x17211e,side:THREE.DoubleSide}));hpbg.position.y=2.12;hpbg.userData.noHit=true;group.add(hpbg);
  const hp=new THREE.Mesh(new THREE.PlaneGeometry(.68,.045),new THREE.MeshBasicMaterial({color:0xff755e,side:THREE.DoubleSide}));hp.position.set(0,2.12,.006);hp.userData.noHit=true;group.add(hp);
  const a=rand(0,Math.PI*2),r=rand(12,20);group.position.set(Math.cos(a)*r,0,Math.sin(a)*r);
@@ -380,6 +380,7 @@ function updateBots(dt){
   }else{
    setBotAnimation(b,'idle');b.inCover=true;
   }
+  b.group.scale.y=b.inCover ? .78 : 1;
   // Briefly peek out to fire, then return behind the nearest obstacle.
   if(b.inCover){b.peekTimer=(b.peekTimer||0)-dt;if(b.peekTimer<=0){b.peekTimer=rand(1.8,3.2);b.peek=true;}if(b.peek){fireBot(b,dt);if(b.peekTimer<.55)b.peek=false;}}
   else fireBot(b,dt);
@@ -393,10 +394,10 @@ function update(dt){
   const forward=new THREE.Vector3(0,0,-1).applyQuaternion(camera.quaternion);forward.y=0;forward.normalize();const right=new THREE.Vector3().crossVectors(forward,new THREE.Vector3(0,1,0)).normalize();
   const move=new THREE.Vector3();if(keys.KeyW)move.add(forward);if(keys.KeyS)move.sub(forward);if(keys.KeyD)move.add(right);if(keys.KeyA)move.sub(right);
   if(move.lengthSq()>0){if(elapsed-lastStepSound>.38){playSound('step');lastStepSound=elapsed;}move.normalize();const speed=(keys.ShiftLeft||keys.ShiftRight)?8.5:5.2;const nx=camera.position.x+move.x*speed*dt,nz=camera.position.z+move.z*speed*dt;if(!moveBlocked(nx,camera.position.z))camera.position.x=nx;if(!moveBlocked(camera.position.x,nz))camera.position.z=nz;bob+=dt*speed;}
-  if(keys.Space&&player.onGround){player.velocity.y=5.1;player.onGround=false;}player.velocity.y-=14*dt;camera.position.y+=player.velocity.y*dt;
   const crouched=!!(keys.KeyC||keys.ControlLeft||keys.ControlRight),eyeHeight=crouched?1.12:1.72;
-  if(camera.position.y<eyeHeight&&player.onGround)camera.position.y=THREE.MathUtils.damp(camera.position.y,eyeHeight,18,dt);
-  if(camera.position.y<=eyeHeight){camera.position.y=eyeHeight;player.velocity.y=0;player.onGround=true;}
+  if(keys.Space&&player.onGround){player.velocity.y=5.1;player.onGround=false;}player.velocity.y-=14*dt;
+  if(player.onGround){camera.position.y=THREE.MathUtils.damp(camera.position.y,eyeHeight,18,dt);if(Math.abs(camera.position.y-eyeHeight)<.015)camera.position.y=eyeHeight;}
+  else{camera.position.y+=player.velocity.y*dt;if(camera.position.y<=eyeHeight){camera.position.y=eyeHeight;player.velocity.y=0;player.onGround=true;}}
   weapon.position.y=Math.sin(bob*1.7)*.012-recoil*.5+(crouched?-.22:0);weapon.position.x=Math.cos(bob*.85)*.008;weapon.rotation.x=-recoil+(crouched?.035:0);
   updateBots(dt);updateProjectiles(dt);updateMission(dt);
   if(bots.every(b=>!b.alive)&&missionDone){playSound('round');player.active=false;document.exitPointerLock?.();$('round-eyebrow').textContent='SECTOR SECURED';$('round-title').textContent='ROUND COMPLETE';$('round-copy').textContent=mapThemes[currentMap].name+' secured. '+player.kills+' hostile units neutralized. Next operation changes the battlefield and mission.';roundScreen.classList.remove('hidden');}

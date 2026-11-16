@@ -2,6 +2,19 @@
 
 A browser-based tactical first-person shooter built for the Make.fun `threejs-fps-02` challenge.
 
+## Clone and run locally
+
+Clone this repository, then enter the game folder:
+
+```bash
+git clone https://github.com/Alexandrexicara/meustrabalhos-mak.git
+cd meustrabalhos-mak/threejs-fps
+npm install
+npm run dev
+```
+
+The game is inside `threejs-fps/`. Add supplied weapon models under `public/assets/weapons/` using the exact names `rifle.glb`, `pistol.glb`, and `at4.glb`. The HUD artwork is in `public/assets/icons/`; replace those SVGs with licensed transparent PNG/WebP artwork if desired, updating the image paths in `src/main.js`.
+
 ## Run locally
 
 Requirements: Node.js 22.18+ and a desktop browser with WebGL2.

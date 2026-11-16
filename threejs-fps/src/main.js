@@ -174,7 +174,7 @@ gunBox(.055,.12,.12,.34,-.42,-.58,gunPolymer);
 gunBox(.12,.045,.19,.34,-.18,-.62,gunAccent);
 // Layered, directional muzzle flash: hot core, branching flame tongues and a short-lived light.
 const muzzleFlash=new THREE.Group();muzzleFlash.position.set(.34,-.22,-1.69);muzzleFlash.visible=false;weapon.add(muzzleFlash);
-const flashCore=new THREE.Mesh(new THREE.SphereGeometry(.105,12,10),new THREE.MeshBasicMaterial({color:0xfff2c2,transparent:true,opacity:1,blending:THREE.AdditiveBlending,depthWrite:false}));flashCore.scale.set(.8,.8,1.8);muzzleFlash.add(flashCore);
+const flashCore=new THREE.Mesh(new THREE.SphereGeometry(.14,14,12),new THREE.MeshBasicMaterial({color:0xfff2c2,transparent:true,opacity:1,blending:THREE.AdditiveBlending,depthWrite:false}));flashCore.scale.set(.8,.8,1.8);muzzleFlash.add(flashCore);
 const flameMat=new THREE.MeshBasicMaterial({color:0xffa12b,transparent:true,opacity:.95,blending:THREE.AdditiveBlending,depthWrite:false,side:THREE.DoubleSide});
 const hotMat=new THREE.MeshBasicMaterial({color:0xffe5a0,transparent:true,opacity:.9,blending:THREE.AdditiveBlending,depthWrite:false,side:THREE.DoubleSide});
 for(let i=0;i<7;i++){
@@ -296,21 +296,21 @@ function makeBot(index){
  // Spawn around the whole combat perimeter, not in one narrow front cluster.
  let spawn=null,bestCandidate=null,bestGap=-1;
  for(let attempt=0;attempt<900;attempt++){
-  const angle=Math.random()*Math.PI*2,radius=rand(18,24);
+  const angle=Math.random()*Math.PI*2,radius=rand(14,24);
   const candidate={x:THREE.MathUtils.clamp(camera.position.x+Math.cos(angle)*radius,-23,23),z:THREE.MathUtils.clamp(camera.position.z+Math.sin(angle)*radius,-23,23)};
   if(moveBlocked(candidate.x,candidate.z))continue;
   const gap=bots.filter(other=>other.alive).reduce((m,other)=>Math.min(m,Math.hypot(other.group.position.x-candidate.x,other.group.position.z-candidate.z)),99);
   if(gap>bestGap){bestGap=gap;bestCandidate=candidate;}
-  if(gap>=7.2){spawn=candidate;break;}
+  if(gap>=4.8){spawn=candidate;break;}
  }
  if(!spawn)spawn=bestCandidate||{x:THREE.MathUtils.clamp((index%4-1.5)*5,-20,20),z:THREE.MathUtils.clamp(-12-Math.floor(index/4)*4,-22,22)};
  group.position.set(spawn.x,0,spawn.z);
- scene.add(group);const bot={group,hp,hpbg,health:100,maxHealth:100,fire:rand(1.4,2.6),speed:rand(1.65,2.15),alerted:false,strafe:index%2?1:-1,alive:true,hitFlash:0,mixer:null};bots.push(bot);
+ scene.add(group);const bot={group,hp,hpbg,health:100,maxHealth:100,fire:rand(.55,1.15),speed:rand(1.35,1.8),alerted:false,strafe:index%2?1:-1,alive:true,hitFlash:0,mixer:null};bots.push(bot);
  if(soldierTemplate)attachSoldier(bot);return bot;
 }
 function spawnWave(){
  buildMap(player.round);for(const b of bots)scene.remove(b.group);bots.length=0;
- const count=Math.min(4+player.round,8);for(let i=0;i<count;i++)makeBot(i);
+ const count=Math.min(8+player.round*2,20);for(let i=0;i<count;i++)makeBot(i);
  $('wave').textContent=String(count).padStart(2,'0');$('radar-count').textContent=String(count).padStart(2,'0');
  $('round-label').textContent='ROUND '+String(player.round).padStart(2,'0');
  const missions=[
@@ -329,7 +329,7 @@ function spawnWave(){
   const beam=new THREE.Mesh(new THREE.CylinderGeometry(.08,.55,4.5,16,1,true),new THREE.MeshBasicMaterial({color,transparent:true,opacity:.16,side:THREE.DoubleSide,depthWrite:false}));beam.position.y=2.25;missionMarker.add(beam);
   const beacon=new THREE.PointLight(color,2.2,9);beacon.position.y=2;missionMarker.add(beacon);scene.add(missionMarker);
  }
- roundTime=Math.max(55,120-player.round*4);updateTimer();
+ roundTime=Math.max(55,120-player.round*4);updateTimer();toast('FRAG READY // G OR RIGHT CLICK');
 }
 function updateMission(dt){
  if(missionDone)return;
@@ -361,7 +361,7 @@ function updateHUD(){
 function moveBlocked(x,z){if(Math.abs(x)>mapBounds||Math.abs(z)>mapBounds)return true;return colliders.some(c=>Math.abs(x-c.x)<c.hx+.42&&Math.abs(z-c.z)<c.hz+.42);}
 function damagePlayer(amount){if(!player.alive)return;playSound('damage');player.health=Math.max(0,player.health-amount);$('damage-flash').classList.add('show');setTimeout(()=>$('damage-flash').classList.remove('show'),100);updateHUD();if(player.health<=0){player.alive=false;player.active=false;document.exitPointerLock?.();$('gameover-copy').textContent='You neutralized '+player.kills+' hostiles across '+player.round+' rounds.';gameoverScreen.classList.remove('hidden');}}
 function fireBot(bot,dt){
- bot.fire-=dt;if(bot.fire>0)return;bot.fire=rand(1.15,1.85);
+ bot.fire-=dt;if(bot.fire>0)return;bot.fire=rand(.72,1.18);
  const origin=bot.heldRifle?bot.heldRifle.localToWorld(new THREE.Vector3(0,0,.94)):bot.group.localToWorld(new THREE.Vector3(0,1.32,.42));
  const target=camera.position.clone().add(new THREE.Vector3(rand(-.9,.9),rand(-.55,.55),rand(-.9,.9)));
  const delta=target.clone().sub(origin),distance=delta.length(),direction=delta.normalize();
@@ -392,14 +392,14 @@ function shoot(){
  scene.add(tracer);setTimeout(()=>{scene.remove(tracer);tracer.geometry.dispose();tracer.material.dispose();},75);
  const targets=[];for(const b of bots)if(b.alive)b.group.traverse(o=>{if(o.isMesh&&!o.userData.noHit&&o.geometry.type!=='PlaneGeometry')targets.push(o);});
  const hit=raycaster.intersectObjects(targets,false)[0];
- if(hit){playSound('hit');const bot=bots.find(b=>{if(!b.alive)return false;let node=hit.object;while(node){if(node===b.group)return true;node=node.parent;}return false;});if(bot){player.hits++;bot.health-=34;bot.hitFlash=.08;bot.hp.scale.x=Math.max(0,bot.health/bot.maxHealth);$('hit-marker').classList.add('show');setTimeout(()=>$('hit-marker').classList.remove('show'),100);if(bot.health<=0){bot.alive=false;scene.remove(bot.group);player.kills++;toast('HOSTILE NEUTRALIZED');}}}
+ if(hit){playSound('hit');const bot=bots.find(b=>{if(!b.alive)return false;let node=hit.object;while(node){if(node===b.group)return true;node=node.parent;}return false;});if(bot){bot.alerted=true;bot.fire=Math.min(bot.fire,.35);player.hits++;bot.health-=34;bot.hitFlash=.08;bot.hp.scale.x=Math.max(0,bot.health/bot.maxHealth);$('hit-marker').classList.add('show');setTimeout(()=>$('hit-marker').classList.remove('show'),100);if(bot.health<=0){bot.alive=false;scene.remove(bot.group);player.kills++;toast('HOSTILE NEUTRALIZED');}}}
  updateHUD();
 }
 function throwGrenade(){
  if(!player.active||!pointerLocked||player.grenades<=0)return;
  player.grenades--;updateHUD();toast('FRAG OUT // '+player.grenades+' LEFT');
  const grenade=new THREE.Mesh(new THREE.SphereGeometry(.105,12,10),mat(0x45513b,.72,.18));
- grenade.position.copy(camera.position).add(new THREE.Vector3(0,-.18,0));
+ grenade.position.copy(camera.position).add(new THREE.Vector3(0,-.12,0));
  const direction=new THREE.Vector3(0,0,-1).applyQuaternion(camera.quaternion);
  const velocity=direction.multiplyScalar(12).add(new THREE.Vector3(0,5.5,0));
  grenade.castShadow=true;scene.add(grenade);grenades.push({mesh:grenade,velocity,fuse:2.15,bounced:false});
@@ -417,7 +417,9 @@ function updateProjectiles(dt){
   if(g.mesh.position.y<.13){g.mesh.position.y=.13;g.velocity.y=Math.abs(g.velocity.y)*.48;g.velocity.x*=.72;g.velocity.z*=.72;g.mesh.rotation.x+=dt*8;g.mesh.rotation.z+=dt*6;}
   if(g.fuse<=0){detonateGrenade(g);grenades.splice(i,1);}
  }
- for(let i=enemyBullets.length-1;i>=0;i--){const b=enemyBullets[i];b.mesh.position.addScaledVector(b.velocity,dt);b.life-=dt;
+ for(let i=enemyBullets.length-1;i>=0;i--){const b=enemyBullets[i];const previous=b.mesh.position.clone();const step=b.velocity.clone().multiplyScalar(dt);const stepLength=step.length();b.mesh.position.add(step);b.life-=dt;
+  // Stop each projectile at the first solid map surface, not only at the firing moment.
+  if(stepLength>0){raycaster.set(previous,step.clone().normalize());raycaster.far=stepLength;const block=raycaster.intersectObjects(world.children,true).find(hit=>hit.object.isMesh&&hit.object.visible);if(block&&block.distance<stepLength+.04)b.life=-1;}
   if(b.mesh.position.distanceTo(camera.position)<.48){damagePlayer(b.damage);b.life=-1;}
   if(b.life<=0){scene.remove(b.mesh);enemyBullets.splice(i,1);}
  }
@@ -458,7 +460,18 @@ function updateBots(dt){
   const p=b.group.position;
   const dx=camera.position.x-p.x,dz=camera.position.z-p.z,dist=Math.hypot(dx,dz)||1;
   // Hostiles remain at their positions until the player gets close enough to alert them.
-  if(!b.alerted&&dist<14){b.alerted=true;b.fire=rand(.8,1.5);}
+  if(!b.alerted){
+   // React to proximity, line of sight, or being hit by the player.
+   let hasSight=false;
+   if(dist<30){
+    const eye=p.clone().add(new THREE.Vector3(0,1.48,0));
+    const toPlayer=camera.position.clone().sub(eye),sightDistance=toPlayer.length();
+    raycaster.set(eye,toPlayer.normalize());raycaster.far=sightDistance;
+    const block=raycaster.intersectObjects(world.children,true).find(hit=>hit.object.isMesh&&hit.object.visible);
+    hasSight=!block||block.distance>sightDistance-.45;
+   }
+   if(dist<25||hasSight){b.alerted=true;b.fire=rand(.25,.7);}
+  }
   if(!b.alerted){setBotAnimation(b,'idle');continue;}
   b.coverTimer=Math.max(0,(b.coverTimer||0)-dt);b.coverCooldown=Math.max(0,(b.coverCooldown||0)-dt);
   const nearCover=colliders.some(c=>Math.abs(p.x-c.x)<c.hx+1.2&&Math.abs(p.z-c.z)<c.hz+1.2);
@@ -494,7 +507,9 @@ function updateBots(dt){
    }
   }
   // Face the actual travel vector so the run cycle cannot look like reverse walking.
-  if(moved){b.group.rotation.y=Math.atan2(moveX,moveZ);setBotAnimation(b,dist>10?'run':'walk');}
+  // Keep the rifle trained on the player while advancing.
+  b.group.rotation.y=Math.atan2(dx,dz);
+  if(moved){setBotAnimation(b,'walk');}
   else if(b.inCover){b.group.lookAt(camera.position.x,p.y+1,camera.position.z);setBotAnimation(b,'idle');}
   else {b.group.lookAt(camera.position.x,p.y+1,camera.position.z);setBotAnimation(b,'idle');}
   b.group.scale.y=b.inCover?.92:1;

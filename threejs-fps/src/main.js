@@ -101,13 +101,13 @@ function buildMap(round){
  const idx=(round-1)%mapThemes.length,theme=mapThemes[idx];currentMap=idx;
  world.clear();
  colliders.length=0;combatVehicles.length=0;
- scene.background=new THREE.Color(theme.sky);scene.fog=new THREE.Fog(theme.fog,24,88);
+ scene.background=new THREE.Color(theme.sky);scene.fog=new THREE.Fog(theme.fog,34,132);
  const floorCanvas=document.createElement('canvas');floorCanvas.width=floorCanvas.height=512;
  const ctx=floorCanvas.getContext('2d');ctx.fillStyle='#'+theme.ground.toString(16).padStart(6,'0');ctx.fillRect(0,0,512,512);
  for(let i=0;i<22000;i++){const v=Math.random(),r=Math.random()*2.8+.3;ctx.fillStyle=v>.5?'rgba(28,29,25,.18)':'rgba(230,211,174,.12)';ctx.beginPath();ctx.ellipse(Math.random()*512,Math.random()*512,r,r*.6,Math.random()*3.14,0,Math.PI*2);ctx.fill();}
  for(let i=0;i<70;i++){ctx.strokeStyle='rgba(30,34,31,.24)';ctx.lineWidth=Math.random()*2+.5;ctx.beginPath();let x=Math.random()*512,y=Math.random()*512;ctx.moveTo(x,y);for(let j=0;j<4;j++){x+=(Math.random()-.5)*35;y+=(Math.random()-.5)*35;ctx.lineTo(x,y);}ctx.stroke();}
- const tex=new THREE.CanvasTexture(floorCanvas);tex.wrapS=tex.wrapT=THREE.RepeatWrapping;tex.repeat.set(10,10);tex.colorSpace=THREE.SRGBColorSpace;
- const ground=new THREE.Mesh(new THREE.PlaneGeometry(110,110),new THREE.MeshStandardMaterial({map:tex,roughness:1}));ground.rotation.x=-Math.PI/2;ground.position.y=-.09;ground.receiveShadow=true;world.add(ground);
+ const tex=new THREE.CanvasTexture(floorCanvas);tex.wrapS=tex.wrapT=THREE.RepeatWrapping;tex.repeat.set(14,14);tex.colorSpace=THREE.SRGBColorSpace;
+ const ground=new THREE.Mesh(new THREE.PlaneGeometry(150,150),new THREE.MeshStandardMaterial({map:tex,roughness:1}));ground.rotation.x=-Math.PI/2;ground.position.y=-.09;ground.receiveShadow=true;world.add(ground);
  const wall=mat(theme.wall),accent=mat(theme.accent),debris=mat(idx===1?0x9b7954:0x5c625d),steel=mat(0x303b3d,.42,.55);
  // Main combat lanes and map-specific silhouettes.
  if(idx===0||idx===3){
@@ -129,7 +129,7 @@ function buildMap(round){
   for(let i=0;i<8;i++){addCrate(-20+i*5,-4,1.45);}
    addTank(10,17);
  }
- for(let i=0;i<95;i++){const x=rand(-27,27),z=rand(-27,27);if(Math.abs(x)<4&&z>0&&z<12)continue;const r=rand(.12,.55);const rock=new THREE.Mesh(new THREE.DodecahedronGeometry(r,0),debris);rock.position.set(x,-.02+r*.25,z);rock.rotation.set(rand(0,3),rand(0,3),rand(0,3));world.add(rock);}
+ for(let i=0;i<180;i++){const x=rand(-36,36),z=rand(-36,36);if(Math.abs(x)<4&&z>0&&z<12)continue;const r=rand(.12,.55);const rock=new THREE.Mesh(new THREE.DodecahedronGeometry(r,0),debris);rock.position.set(x,-.02+r*.25,z);rock.rotation.set(rand(0,3),rand(0,3),rand(0,3));world.add(rock);}
  for(let i=0;i<6;i++){const barrel=new THREE.Mesh(new THREE.CylinderGeometry(.38,.42,1.05,16),mat(idx===1?0x75603f:0x59483b));barrel.position.set(rand(-22,22),.52,rand(-22,22));barrel.castShadow=true;world.add(barrel);}
   // Extra waist-high wooden cover positions, spread through each combat lane.
   for(const [x,z] of [[-22,-8],[22,-7],[-19,10],[19,11],[-5,18],[5,-13]])addCrate(x,z,1.5);
@@ -190,7 +190,7 @@ let missionMarker=null,missionKind='eliminate',missionProgress=0,missionDuration
 const keys={}; let pointerLocked=false, elapsed=0, roundTime=120, recoil=0, bob=0, shotCooldown=0, toastTimeout;
 const $=id=>document.getElementById(id);
 const startScreen=$('start-screen'),pauseScreen=$('pause-screen'),roundScreen=$('round-screen'),gameoverScreen=$('gameover-screen');
-const mapBounds=25;
+const mapBounds=36;
 function rand(min,max){return min+Math.random()*(max-min)}
 function toast(message){$('toast').textContent=message;$('toast').classList.add('show');clearTimeout(toastTimeout);toastTimeout=setTimeout(()=>$('toast').classList.remove('show'),1700)}
 let audioCtx=null,masterGain=null,ambientStarted=false,lastStepSound=0;
@@ -295,9 +295,9 @@ function makeBot(index){
  const hp=new THREE.Mesh(new THREE.PlaneGeometry(.68,.045),new THREE.MeshBasicMaterial({color:0xff755e,side:THREE.DoubleSide}));hp.position.set(0,2.12,.006);hp.userData.noHit=true;group.add(hp);
  // Spawn around the whole combat perimeter, not in one narrow front cluster.
  let spawn=null,bestCandidate=null,bestGap=-1;
- for(let attempt=0;attempt<900;attempt++){
-  const angle=Math.random()*Math.PI*2,radius=rand(14,24);
-  const candidate={x:THREE.MathUtils.clamp(camera.position.x+Math.cos(angle)*radius,-23,23),z:THREE.MathUtils.clamp(camera.position.z+Math.sin(angle)*radius,-23,23)};
+ for(let attempt=0;attempt<1400;attempt++){
+  const angle=Math.random()*Math.PI*2,radius=rand(18,34);
+  const candidate={x:THREE.MathUtils.clamp(camera.position.x+Math.cos(angle)*radius,-34,34),z:THREE.MathUtils.clamp(camera.position.z+Math.sin(angle)*radius,-34,34)};
   if(moveBlocked(candidate.x,candidate.z))continue;
   const gap=bots.filter(other=>other.alive).reduce((m,other)=>Math.min(m,Math.hypot(other.group.position.x-candidate.x,other.group.position.z-candidate.z)),99);
   if(gap>bestGap){bestGap=gap;bestCandidate=candidate;}
@@ -310,7 +310,7 @@ function makeBot(index){
 }
 function spawnWave(){
  buildMap(player.round);for(const b of bots)scene.remove(b.group);bots.length=0;
- const count=Math.min(8+player.round*2,20);for(let i=0;i<count;i++)makeBot(i);
+ const count=Math.min(18+(player.round-1)*4,40);for(let i=0;i<count;i++)makeBot(i);
  $('wave').textContent=String(count).padStart(2,'0');$('radar-count').textContent=String(count).padStart(2,'0');
  $('round-label').textContent='ROUND '+String(player.round).padStart(2,'0');
  const missions=[
@@ -336,7 +336,7 @@ function updateMission(dt){
  const remaining=bots.filter(b=>b.alive).length;
  if(missionKind==='eliminate'){
   $('objective-sub').textContent=remaining>0?'ELIMINATE HOSTILES // '+remaining+' REMAIN':'ALL HOSTILES ELIMINATED // SECTOR CLEAR';
-  if(remaining===0){missionDone=true;toast('SECTOR CLEAR // OBJECTIVE COMPLETE');}
+  if(remaining===0){missionDone=true;$('objective-sub').textContent='SETOR LIMPO // OPERAÇÃO CONCLUÍDA — PREPARE-SE PARA A PRÓXIMA FASE';toast('SECTOR CLEAR // NEXT OPERATION READY');}
   return;
  }
  if(remaining>0){
@@ -350,7 +350,7 @@ function updateMission(dt){
  else if(missionKind==='defend')missionProgress=Math.max(0,missionProgress-dt*.55);
  const pct=Math.floor(missionProgress/missionDuration*100);
  $('objective-sub').textContent=inside?'SECURING OBJECTIVE // '+pct+'%':'GO TO BEACON // '+Math.ceil(distance)+' M';
- if(missionProgress>=missionDuration){missionDone=true;toast('OBJECTIVE COMPLETE // SECTOR CLEAR');$('objective-sub').textContent='OBJECTIVE COMPLETE // SECTOR CLEAR';}
+ if(missionProgress>=missionDuration){missionDone=true;toast('OBJECTIVE COMPLETE // NEXT OPERATION READY');$('objective-sub').textContent='OBJETIVO CONCLUÍDO // PRÓXIMA FASE LIBERADA';}
 }
 function updateTimer(){const m=Math.floor(roundTime/60),s=Math.floor(roundTime%60);$('round-timer').textContent=String(m).padStart(2,'0')+':'+String(s).padStart(2,'0');}
 function updateHUD(){
@@ -553,7 +553,7 @@ function update(dt){
   else{camera.position.y+=player.velocity.y*dt;if(camera.position.y<=eyeHeight){camera.position.y=eyeHeight;player.velocity.y=0;player.onGround=true;}}
   weapon.position.y=Math.sin(bob*1.7)*.012-recoil*.5+(crouched?-.22:0);weapon.position.x=Math.cos(bob*.85)*.008;weapon.rotation.x=-recoil+(crouched?.035:0);
   updateBots(dt);updateProjectiles(dt);updateMission(dt);
-  if(bots.every(b=>!b.alive)&&missionDone){playSound('round');player.active=false;document.exitPointerLock?.();$('round-eyebrow').textContent='SECTOR SECURED';$('round-title').textContent='ROUND COMPLETE';$('round-copy').textContent=mapThemes[currentMap].name+' secured. '+player.kills+' hostile units neutralized. Next operation changes the battlefield and mission.';roundScreen.classList.remove('hidden');}
+  if(bots.every(b=>!b.alive)&&missionDone){playSound('round');player.active=false;document.exitPointerLock?.();$('round-eyebrow').textContent='SECTOR SECURED';$('round-title').textContent='ROUND COMPLETE';$('round-copy').textContent=mapThemes[currentMap].name+' secured. '+player.kills+' hostile units neutralized. Próxima fase: novo mapa, mais inimigos e novo objetivo. Pressione NEXT OPERATION para continuar.';roundScreen.classList.remove('hidden');}
   if(Math.floor(elapsed*3)%2===0)updateRadar();
  }
  $('clock').textContent=String(Math.floor(elapsed/60)).padStart(2,'0')+':'+String(Math.floor(elapsed%60)).padStart(2,'0');

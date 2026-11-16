@@ -7,11 +7,23 @@ scene.background = new THREE.Color(0x89999a);
 scene.fog = new THREE.Fog(0x89999a, 22, 78);
 const camera = new THREE.PerspectiveCamera(76, innerWidth / innerHeight, 0.1, 120);
 camera.position.set(0, 1.72, 8);
-const renderer = new THREE.WebGLRenderer({ canvas, antialias: false, alpha: false, powerPreference: 'low-power', failIfMajorPerformanceCaveat: false });
-renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.15));
-renderer.setSize(Math.floor(innerWidth * Math.min(window.devicePixelRatio || 1, 1.15)), Math.floor(innerHeight * Math.min(window.devicePixelRatio || 1, 1.15)), false);
-renderer.domElement.style.width = '100%'; renderer.domElement.style.height = '100%';
-renderer.setSize(innerWidth, innerHeight);
+let renderer = null;
+try {
+ renderer = new THREE.WebGLRenderer({ canvas, antialias: false, alpha: false, powerPreference: 'low-power', failIfMajorPerformanceCaveat: false });
+} catch (error) {
+ console.error('WebGL2 initialization failed:', error);
+ canvas.style.display = 'none';
+ const fallback = document.createElement('section');
+ fallback.setAttribute('role', 'alert');
+ fallback.style.cssText = 'position:fixed;inset:0;z-index:9999;display:grid;place-content:center;gap:14px;padding:32px;background:#080d12;color:#e8eee9;font:14px/1.6 system-ui,sans-serif;text-align:center';
+ fallback.innerHTML = '<div style="font-size:28px;font-weight:800;letter-spacing:.12em">GRAPHICS UNAVAILABLE</div><div style="max-width:560px;color:#b9c6bf">This tactical FPS requires WebGL 2, but this browser session refused to create a graphics context.</div><div style="max-width:560px;color:#8fa39a">Open the game in a regular Chrome tab (not an embedded or sandboxed preview), enable hardware acceleration in Chrome settings, and reload the page.</div><div style="color:#6f887d;font-size:11px;letter-spacing:.12em">NO GAME DATA WAS LOST</div>';
+ document.body.appendChild(fallback);
+}
+if (renderer) {
+ renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.15));
+ renderer.setSize(innerWidth, innerHeight, false);
+ renderer.domElement.style.width = '100%';
+ renderer.domElement.style.height = '100%';
 renderer.shadowMap.enabled = false;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 renderer.outputColorSpace = THREE.SRGBColorSpace;
@@ -130,3 +142,4 @@ function update(dt){
 }
 function animate(){requestAnimationFrame(animate);if(contextLost)return;const dt=Math.min(clock.getDelta(),.04);update(dt);try{renderer.render(scene,camera);}catch(error){console.error('Render failed:',error);}}
 spawnWave();updateHUD();animate();
+}

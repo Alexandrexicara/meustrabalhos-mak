@@ -456,63 +456,58 @@ function chooseCover(bot){
 }
 function updateBots(dt){
  for(let i=0;i<bots.length;i++){
-  const b=bots[i];if(!b.alive)continue;if(b.mixer)b.mixer.update(dt);
+  const b=bots[i];if(!b.alive)continue;
+  if(b.mixer)b.mixer.update(dt);
   const p=b.group.position;
   const dx=camera.position.x-p.x,dz=camera.position.z-p.z,dist=Math.hypot(dx,dz)||1;
-  // Hostiles remain at their positions until the player gets close enough to alert them.
   if(!b.alerted){
-   // React to proximity, line of sight, or being hit by the player.
-   let hasSight=false;
-   if(dist<30){
+   // Detection is based on actual line of sight or close proximity, never a broad distance trigger.
+   let enemySeesPlayer=false,playerSeesEnemy=false;
+   if(dist<34){
     const eye=p.clone().add(new THREE.Vector3(0,1.48,0));
     const toPlayer=camera.position.clone().sub(eye),sightDistance=toPlayer.length();
-    raycaster.set(eye,toPlayer.normalize());raycaster.far=sightDistance;
+    raycaster.set(eye,toPlayer.clone().normalize());raycaster.far=sightDistance;
     const block=raycaster.intersectObjects(world.children,true).find(hit=>hit.object.isMesh&&hit.object.visible);
-    hasSight=!block||block.distance>sightDistance-.45;
+    enemySeesPlayer=!block||block.distance>sightDistance-.5;
+    if(enemySeesPlayer){
+     camera.updateMatrixWorld();
+     const toEnemy=p.clone().add(new THREE.Vector3(0,1.25,0)).sub(camera.position);
+     const viewDir=new THREE.Vector3(0,0,-1).applyQuaternion(camera.quaternion);
+     const inView=viewDir.dot(toEnemy.clone().normalize())>.94;
+     if(inView){
+      raycaster.set(camera.position,toEnemy.clone().normalize());raycaster.far=toEnemy.length();
+      const viewBlock=raycaster.intersectObjects(world.children,true).find(hit=>hit.object.isMesh&&hit.object.visible);
+      playerSeesEnemy=!viewBlock||viewBlock.distance>toEnemy.length()-.5;
+     }
+    }
    }
-   if(dist<25||hasSight){b.alerted=true;b.fire=rand(.25,.7);}
+   if(dist<11||enemySeesPlayer||playerSeesEnemy){
+    b.alerted=true;b.fire=rand(.25,.65);b.burst=rand(2,4);b.strafeTimer=rand(2,4);
+   }
   }
   if(!b.alerted){setBotAnimation(b,'idle');continue;}
-  b.coverTimer=Math.max(0,(b.coverTimer||0)-dt);b.coverCooldown=Math.max(0,(b.coverCooldown||0)-dt);
-  const nearCover=colliders.some(c=>Math.abs(p.x-c.x)<c.hx+1.2&&Math.abs(p.z-c.z)<c.hz+1.2);
-  if(dist>10&&nearCover&&b.coverCooldown<=0&&b.coverTimer<=0&&Math.random()<.0018){b.coverTimer=rand(.25,.45);b.coverCooldown=rand(7,11);}
-  b.inCover=b.coverTimer>0;
-  // Squad separation prevents a single pile-up while the whole group presses forward.
-  let sepX=0,sepZ=0;
-  for(let j=0;j<bots.length;j++){if(i===j||!bots[j].alive)continue;const ox=p.x-bots[j].group.position.x,oz=p.z-bots[j].group.position.z,od=Math.hypot(ox,oz);if(od>0&&od<3.8){const push=(3.8-od)/3.8;sepX+=ox/od*push;sepZ+=oz/od*push;}}
-  let dirX=dx/dist+sepX*.7,dirZ=dz/dist+sepZ*.7;
-  // Alternate short flanks only at close range; never backpedal away from the player.
-  if(dist<8){const flank=b.strafe*(dist<4?.22:.38);dirX+=(-dz/dist)*flank;dirZ+=(dx/dist)*flank;}
-  const len=Math.hypot(dirX,dirZ)||1;dirX/=len;dirZ/=len;
-  const speed=b.inCover?b.speed*.12:b.speed*(dist>16?1.45:dist>9?1.2:.82);
-  const step=speed*dt;
+  // Soldiers fight from separated positions. Only a small assault element advances,
+  // and it stops at a safe firing distance instead of charging the player as a mob.
+  b.strafeTimer=Math.max(0,(b.strafeTimer||0)-dt);
   let moveX=0,moveZ=0,moved=false;
-  // Search a wide arc around obstacles and select the closest safe forward step.
-  let bestScore=-Infinity;
-  for(let k=0;k<24;k++){
-   const angle=(k-11.5)*Math.PI/24;
-   const c=Math.cos(angle),sn=Math.sin(angle);
-   const vx=dirX*c-dirZ*sn,vz=dirX*sn+dirZ*c;
-   const nx=p.x+vx*step,nz=p.z+vz*step;if(moveBlocked(nx,nz))continue;
-   const nextDist=Math.hypot(camera.position.x-nx,camera.position.z-nz);
-   const score=(dist-nextDist)*4+(vx*dirX+vz*dirZ)*.5-Math.abs(angle)*.018;
-   if(score>bestScore){bestScore=score;moveX=vx;moveZ=vz;moved=true;}
-  }
-  if(moved&&!b.inCover){p.x+=moveX*step;p.z+=moveZ*step;}
-  else if(!moved){
-   // Try a wider left/right bypass; do not freeze when the direct lane is blocked.
-   for(const sign of [b.strafe,-b.strafe]){
-    const vx=dirX*.25+(-dirZ)*sign*.97,vz=dirZ*.25+dirX*sign*.97;
-    if(!moveBlocked(p.x+vx*step,p.z+vz*step)){moveX=vx;moveZ=vz;p.x+=vx*step;p.z+=vz*step;moved=true;break;}
+  const assault=(i%5===0);
+  if(assault&&dist>13&&dist<28&&b.strafeTimer<=0){
+   const side=b.strafe*(Math.random()<.5?1:-1);
+   const forward=Math.min(.28,Math.max(0,(dist-13)/dist));
+   const vx=(dx/dist)*forward+(-dz/dist)*side*.96;
+   const vz=(dz/dist)*forward+(dx/dist)*side*.96;
+   const len=Math.hypot(vx,vz)||1;
+   moveX=vx/len;moveZ=vz/len;
+   const step=Math.min(.65, b.speed*.38)*dt;
+   if(!moveBlocked(p.x+moveX*step,p.z+moveZ*step)){
+    p.x+=moveX*step;p.z+=moveZ*step;moved=true;
    }
+   b.strafeTimer=rand(2.8,5.5);
   }
-  // Face the actual travel vector so the run cycle cannot look like reverse walking.
-  // Keep the rifle trained on the player while advancing.
+  // Keep the torso, rifle and muzzle aimed at the player's current position.
   b.group.rotation.y=Math.atan2(dx,dz);
-  if(moved){setBotAnimation(b,'walk');}
-  else if(b.inCover){b.group.lookAt(camera.position.x,p.y+1,camera.position.z);setBotAnimation(b,'idle');}
-  else {b.group.lookAt(camera.position.x,p.y+1,camera.position.z);setBotAnimation(b,'idle');}
-  b.group.scale.y=b.inCover?.92:1;
+  if(moved)setBotAnimation(b,'walk');else setBotAnimation(b,'idle');
+  b.group.scale.y=1;
   fireBot(b,dt);
  }
 }

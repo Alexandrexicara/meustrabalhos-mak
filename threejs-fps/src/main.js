@@ -236,7 +236,7 @@ function makeBot(index){
  for(const arm of fallback.children.filter(o=>o.geometry?.type==='CapsuleGeometry'&&o.position.y>1)){arm.position.y=1.22;arm.position.z=.16;arm.rotation.x=.82;}
  const hpbg=new THREE.Mesh(new THREE.PlaneGeometry(.72,.07),new THREE.MeshBasicMaterial({color:0x17211e,side:THREE.DoubleSide}));hpbg.position.y=2.12;hpbg.userData.noHit=true;group.add(hpbg);
  const hp=new THREE.Mesh(new THREE.PlaneGeometry(.68,.045),new THREE.MeshBasicMaterial({color:0xff755e,side:THREE.DoubleSide}));hp.position.set(0,2.12,.006);hp.userData.noHit=true;group.add(hp);
- const a=rand(0,Math.PI*2),r=rand(12,20);group.position.set(Math.cos(a)*r,0,Math.sin(a)*r);
+ let spawn={x:0,z:-16};for(let attempt=0;attempt<40;attempt++){const candidate={x:rand(-12,12),z:rand(-21,-13)};if(!moveBlocked(candidate.x,candidate.z)&&!bots.some(other=>other.alive&&Math.hypot(other.group.position.x-candidate.x,other.group.position.z-candidate.z)<3)){spawn=candidate;break;}}group.position.set(spawn.x,0,spawn.z);
  scene.add(group);const bot={group,hp,hpbg,health:100,maxHealth:100,fire:rand(2.2,4.5),speed:rand(1.2,2),strafe:rand(-1,1),alive:true,hitFlash:0,mixer:null};bots.push(bot);
  if(soldierTemplate)attachSoldier(bot);return bot;
 }
@@ -251,7 +251,7 @@ function spawnWave(){
   {kind:'defend',title:'DEFEND THE EXTRACTION ZONE',sub:'Clear hostiles and hold the extraction perimeter',duration:25},
   {kind:'sabotage',title:'SABOTAGE THE DEPOT',sub:'Clear hostiles, then secure the marked depot',duration:10}
  ];
- const mission=missions[(player.round-1)%missions.length];missionKind=mission.kind;missionDuration=mission.duration;missionProgress=0;missionDone=mission.kind==='eliminate';
+ const mission=missions[(player.round-1)%missions.length];missionKind=mission.kind;missionDuration=mission.duration;missionProgress=0;missionDone=false;missionX=player.round%2?-8:8;missionZ=-8;
  $('objective').textContent=mission.title;$('objective-sub').textContent=mission.sub;$('match-state').textContent=mapThemes[currentMap].name;
  if(missionMarker){scene.remove(missionMarker);missionMarker=null;}
  if(missionKind!=='eliminate'){
@@ -264,14 +264,25 @@ function spawnWave(){
  roundTime=Math.max(55,120-player.round*4);updateTimer();
 }
 function updateMission(dt){
- if(missionDone||missionKind==='eliminate')return;
+ if(missionDone)return;
+ const remaining=bots.filter(b=>b.alive).length;
+ if(missionKind==='eliminate'){
+  $('objective-sub').textContent=remaining>0?'ELIMINATE HOSTILES // '+remaining+' REMAIN':'ALL HOSTILES ELIMINATED // SECTOR CLEAR';
+  if(remaining===0){missionDone=true;toast('SECTOR CLEAR // OBJECTIVE COMPLETE');}
+  return;
+ }
+ if(remaining>0){
+  missionProgress=0;
+  $('objective-sub').textContent='ELIMINATE HOSTILES FIRST // '+remaining+' REMAIN';
+  return;
+ }
  const dx=camera.position.x-missionX,dz=camera.position.z-missionZ;
- const radius=missionKind==='defend'?7.5:3.2,inside=dx*dx+dz*dz<=radius*radius;
+ const distance=Math.hypot(dx,dz),radius=missionKind==='defend'?7.5:3.2,inside=distance<=radius;
  if(inside){missionProgress=Math.min(missionDuration,missionProgress+dt);if(missionMarker)missionMarker.rotation.y+=dt*.7;}
  else if(missionKind==='defend')missionProgress=Math.max(0,missionProgress-dt*.55);
  const pct=Math.floor(missionProgress/missionDuration*100);
- $('objective-sub').textContent=(inside?'ZONE SECURED // ':'MOVE TO MARKER // ')+pct+'%';
- if(missionProgress>=missionDuration){missionDone=true;toast('OBJECTIVE COMPLETE // EXTRACT');$('objective-sub').textContent='OBJECTIVE COMPLETE // SECTOR CLEAR';}
+ $('objective-sub').textContent=inside?'SECURING OBJECTIVE // '+pct+'%':'GO TO BEACON // '+Math.ceil(distance)+' M';
+ if(missionProgress>=missionDuration){missionDone=true;toast('OBJECTIVE COMPLETE // SECTOR CLEAR');$('objective-sub').textContent='OBJECTIVE COMPLETE // SECTOR CLEAR';}
 }
 function updateTimer(){const m=Math.floor(roundTime/60),s=Math.floor(roundTime%60);$('round-timer').textContent=String(m).padStart(2,'0')+':'+String(s).padStart(2,'0');}
 function updateHUD(){
@@ -282,7 +293,7 @@ function updateHUD(){
 function moveBlocked(x,z){if(Math.abs(x)>mapBounds||Math.abs(z)>mapBounds)return true;return colliders.some(c=>Math.abs(x-c.x)<c.hx+.42&&Math.abs(z-c.z)<c.hz+.42);}
 function damagePlayer(amount){if(!player.alive)return;playSound('damage');player.health=Math.max(0,player.health-amount);$('damage-flash').classList.add('show');setTimeout(()=>$('damage-flash').classList.remove('show'),100);updateHUD();if(player.health<=0){player.alive=false;player.active=false;document.exitPointerLock?.();$('gameover-copy').textContent='You neutralized '+player.kills+' hostiles across '+player.round+' rounds.';gameoverScreen.classList.remove('hidden');}}
 function fireBot(bot,dt){
- bot.fire-=dt;if(bot.fire>0)return;bot.fire=rand(bot.inCover?1.7:1.2,bot.inCover?2.8:2.1);
+ bot.fire-=dt;if(bot.fire>0)return;bot.fire=rand(.78,1.45);
  if(bot.heldRifle){const flash=new THREE.Mesh(new THREE.SphereGeometry(.075,8,6),new THREE.MeshBasicMaterial({color:0xffc16a,transparent:true,opacity:.95,blending:THREE.AdditiveBlending,depthWrite:false}));flash.position.set(.23,1.03,.98);bot.group.add(flash);setTimeout(()=>{bot.group.remove(flash);flash.geometry.dispose();flash.material.dispose();},65);}
  const origin=bot.group.position.clone().add(new THREE.Vector3(0,1.28,0));
  const target=camera.position.clone().add(new THREE.Vector3(rand(-.65,.65),rand(-.45,.45),rand(-.65,.65)));
@@ -365,25 +376,43 @@ function updateBots(dt){
  for(const b of bots){
   if(!b.alive)continue;if(b.mixer)b.mixer.update(dt);
   const p=b.group.position;
-  const dx=camera.position.x-p.x,dz=camera.position.z-p.z,dist=Math.hypot(dx,dz);
-  // Face the player first: Object3D.lookAt points the soldier's local +Z toward the target.
+  const dx=camera.position.x-p.x,dz=camera.position.z-p.z,dist=Math.hypot(dx,dz)||1;
+  // Enemies face and actively push toward the operator instead of camping behind cover.
   b.group.lookAt(camera.position.x,p.y+1,camera.position.z);
-  if(!b.cover||elapsed>(b.coverUntil||0)){b.cover=chooseCover(b);b.coverUntil=elapsed+rand(5,9);}
-  const target=b.cover||{x:camera.position.x-dx/Math.max(dist,1)*9,z:camera.position.z-dz/Math.max(dist,1)*9};
-  const tx=target.x-p.x,tz=target.z-p.z,td=Math.hypot(tx,tz);
-  if(td>1.1&&dist>6){
-   setBotAnimation(b,'walk');
-   const step=Math.min(td,b.speed*dt);
-   const nx=p.x+tx/td*step,nz=p.z+tz/td*step;
-   if(!moveBlocked(nx,p.z))p.x=nx;if(!moveBlocked(p.x,nz))p.z=nz;
-   b.inCover=false;
-  }else{
-   setBotAnimation(b,'idle');b.inCover=true;
+  b.coverTimer=Math.max(0,(b.coverTimer||0)-dt);
+  b.coverCooldown=Math.max(0,(b.coverCooldown||0)-dt);
+  const nearCover=colliders.some(c=>Math.abs(p.x-c.x)<c.hx+1.7&&Math.abs(p.z-c.z)<c.hz+1.7);
+  if(dist>7&&nearCover&&b.coverCooldown<=0&&b.coverTimer<=0&&Math.random()<.012){
+   b.coverTimer=rand(.65,1.15);b.coverCooldown=rand(5,8);
   }
-  b.group.scale.y=b.inCover ? .78 : 1;
-  // Briefly peek out to fire, then return behind the nearest obstacle.
-  if(b.inCover){b.peekTimer=(b.peekTimer||0)-dt;if(b.peekTimer<=0){b.peekTimer=rand(1.8,3.2);b.peek=true;}if(b.peek){fireBot(b,dt);if(b.peekTimer<.55)b.peek=false;}}
-  else fireBot(b,dt);
+  b.inCover=b.coverTimer>0;
+  let mx=0,mz=0;
+  if(dist>7){
+   // Aggressive advance with a small lateral offset so soldiers do not form one line.
+   const side=b.strafe>=0?1:-1;
+   mx=dx/dist+(-dz/dist)*side*.16;
+   mz=dz/dist+(dx/dist)*side*.16;
+  }else{
+   // At close range, strafe and keep firing rather than retreating or standing still.
+   const side=b.strafe>=0?1:-1;
+   mx=(-dz/dist)*side;mz=(dx/dist)*side;
+  }
+  const length=Math.hypot(mx,mz)||1;mx/=length;mz/=length;
+  const speed=b.inCover?b.speed*.42:b.speed*(dist>7?1.65:1.05);
+  const step=speed*dt;
+  let nx=p.x+mx*step,nz=p.z+mz*step;
+  if(moveBlocked(nx,nz)){
+   const alt1x=p.x+(-mz)*step,alt1z=p.z+mx*step;
+   const alt2x=p.x+mz*step,alt2z=p.z-mx*step;
+   if(!moveBlocked(alt1x,alt1z)){nx=alt1x;nz=alt1z;}
+   else if(!moveBlocked(alt2x,alt2z)){nx=alt2x;nz=alt2z;}
+   else{nx=p.x;nz=p.z;}
+  }
+  if(Math.hypot(nx-p.x,nz-p.z)>.001){p.x=nx;p.z=nz;setBotAnimation(b,'walk');}
+  else setBotAnimation(b,'idle');
+  b.group.scale.y=b.inCover?.86:1;
+  // They keep shooting while advancing; cover only interrupts movement briefly.
+  fireBot(b,dt);
  }
 }
 function updateRadar(){const root=$('radar-dots');root.innerHTML='';for(const b of bots){if(!b.alive)continue;const dx=(b.group.position.x-camera.position.x)/55*130,dz=(b.group.position.z-camera.position.z)/55*130;const dot=document.createElement('i');dot.className='radar-dot';dot.style.left='calc(50% + '+THREE.MathUtils.clamp(dx,-62,62)+'px)';dot.style.top='calc(50% + '+THREE.MathUtils.clamp(dz,-62,62)+'px)';root.append(dot);}}

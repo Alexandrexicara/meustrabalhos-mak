@@ -206,7 +206,8 @@ function attachSoldier(bot){
  bot.mixer=new THREE.AnimationMixer(model);
  const idle=soldierClips.find(c=>/idle/i.test(c.name))||soldierClips[0];
  const walk=soldierClips.find(c=>/walk/i.test(c.name))||idle;
- bot.actions={idle:idle?bot.mixer.clipAction(idle):null,walk:walk?bot.mixer.clipAction(walk):null};
+ const run=soldierClips.find(c=>/run/i.test(c.name))||walk;
+ bot.actions={idle:idle?bot.mixer.clipAction(idle):null,walk:walk?bot.mixer.clipAction(walk):null,run:run?bot.mixer.clipAction(run):null};
  bot.currentAction=null;setBotAnimation(bot,'idle');
 }
 function setBotAnimation(bot,name){
@@ -373,45 +374,55 @@ function chooseCover(bot){
  return best;
 }
 function updateBots(dt){
- for(const b of bots){
-  if(!b.alive)continue;if(b.mixer)b.mixer.update(dt);
+ for(let i=0;i<bots.length;i++){
+  const b=bots[i];if(!b.alive)continue;if(b.mixer)b.mixer.update(dt);
   const p=b.group.position;
   const dx=camera.position.x-p.x,dz=camera.position.z-p.z,dist=Math.hypot(dx,dz)||1;
-  // Enemies face and actively push toward the operator instead of camping behind cover.
   b.group.lookAt(camera.position.x,p.y+1,camera.position.z);
   b.coverTimer=Math.max(0,(b.coverTimer||0)-dt);
   b.coverCooldown=Math.max(0,(b.coverCooldown||0)-dt);
-  const nearCover=colliders.some(c=>Math.abs(p.x-c.x)<c.hx+1.7&&Math.abs(p.z-c.z)<c.hz+1.7);
-  if(dist>7&&nearCover&&b.coverCooldown<=0&&b.coverTimer<=0&&Math.random()<.012){
-   b.coverTimer=rand(.65,1.15);b.coverCooldown=rand(5,8);
+  // Only take short cover pauses when close to an actual obstacle; never camp.
+  const nearCover=colliders.some(c=>Math.abs(p.x-c.x)<c.hx+1.4&&Math.abs(p.z-c.z)<c.hz+1.4);
+  if(dist>9&&nearCover&&b.coverCooldown<=0&&b.coverTimer<=0&&Math.random()<.004){
+   b.coverTimer=rand(.35,.65);b.coverCooldown=rand(6,9);
   }
   b.inCover=b.coverTimer>0;
-  let mx=0,mz=0;
-  if(dist>7){
-   // Aggressive advance with a small lateral offset so soldiers do not form one line.
-   const side=b.strafe>=0?1:-1;
-   mx=dx/dist+(-dz/dist)*side*.16;
-   mz=dz/dist+(dx/dist)*side*.16;
-  }else{
-   // At close range, strafe and keep firing rather than retreating or standing still.
-   const side=b.strafe>=0?1:-1;
-   mx=(-dz/dist)*side;mz=(dx/dist)*side;
-  }
-  const length=Math.hypot(mx,mz)||1;mx/=length;mz/=length;
-  const speed=b.inCover?b.speed*.42:b.speed*(dist>7?1.65:1.05);
+  const side=(b.strafe>=0?1:-1);
+  let desiredX=dx/dist,desiredZ=dz/dist;
+  // Keep a loose squad formation, but never let separation override forward pressure.
+  let sepX=0,sepZ=0;
+  for(let j=0;j<bots.length;j++){if(i===j||!bots[j].alive)continue;const ox=p.x-bots[j].group.position.x,oz=p.z-bots[j].group.position.z,od=Math.hypot(ox,oz);if(od>0&&od<2.1){sepX+=ox/od*(2.1-od);sepZ+=oz/od*(2.1-od);}}
+  desiredX+=sepX*.22;desiredZ+=sepZ*.22;
+  if(dist<7){desiredX+=(-dz/dist)*side*.55;desiredZ+=(dx/dist)*side*.55;}
+  const desiredLen=Math.hypot(desiredX,desiredZ)||1;desiredX/=desiredLen;desiredZ/=desiredLen;
+  const speed=b.inCover?b.speed*.25:b.speed*(dist>12?2.15:dist>7?1.55:1.0);
   const step=speed*dt;
-  let nx=p.x+mx*step,nz=p.z+mz*step;
-  if(moveBlocked(nx,nz)){
-   const alt1x=p.x+(-mz)*step,alt1z=p.z+mx*step;
-   const alt2x=p.x+mz*step,alt2z=p.z-mx*step;
-   if(!moveBlocked(alt1x,alt1z)){nx=alt1x;nz=alt1z;}
-   else if(!moveBlocked(alt2x,alt2z)){nx=alt2x;nz=alt2z;}
-   else{nx=p.x;nz=p.z;}
+  // Local steering: sample directions around the desired heading and choose the
+  // walkable step that makes the most progress toward the player.
+  let best=null,bestScore=-Infinity;
+  for(let k=0;k<16;k++){
+   const angle=k*Math.PI/8;
+   const c=Math.cos(angle),sn=Math.sin(angle);
+   const vx=desiredX*c-desiredZ*sn,vz=desiredX*sn+desiredZ*c;
+   const nx=p.x+vx*step,nz=p.z+vz*step;
+   if(moveBlocked(nx,nz))continue;
+   const nextDist=Math.hypot(camera.position.x-nx,camera.position.z-nz);
+   const score=(dist-nextDist)*3+(vx*desiredX+vz*desiredZ)*.7-Math.abs(angle)*.025;
+   if(score>bestScore){bestScore=score;best={x:nx,z:nz};}
   }
-  if(Math.hypot(nx-p.x,nz-p.z)>.001){p.x=nx;p.z=nz;setBotAnimation(b,'walk');}
-  else setBotAnimation(b,'idle');
-  b.group.scale.y=b.inCover?.86:1;
-  // They keep shooting while advancing; cover only interrupts movement briefly.
+  if(best&&(!b.inCover||Math.random()>.15)){
+   p.x=best.x;p.z=best.z;
+   setBotAnimation(b,dist>11?'run':'walk');
+  }else if(b.inCover){setBotAnimation(b,'idle');}
+  else{
+   // If a collider traps the direct approach, sidestep around it instead of freezing.
+   const nx=p.x+(-desiredZ)*step*1.8,nz=p.z+desiredX*step*1.8;
+   const bx=p.x+desiredZ*step*1.8,bz=p.z-desiredX*step*1.8;
+   if(!moveBlocked(nx,nz)){p.x=nx;p.z=nz;setBotAnimation(b,'run');}
+   else if(!moveBlocked(bx,bz)){p.x=bx;p.z=bz;setBotAnimation(b,'run');}
+   else setBotAnimation(b,'idle');
+  }
+  b.group.scale.y=b.inCover?.9:1;
   fireBot(b,dt);
  }
 }

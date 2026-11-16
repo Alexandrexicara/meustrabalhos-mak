@@ -94,7 +94,7 @@ const mapThemes=[
  {name:'OLD TOWN // URBAN WARZONE',sky:0x89999a,fog:0x89999a,ground:0x777363,wall:0x66716c,accent:0x687d59},
  {name:'RED DUNE // DESERT OUTPOST',sky:0xc69a70,fog:0xc69a70,ground:0xb69a70,wall:0x9b7854,accent:0x786044},
  {name:'IRON YARD // INDUSTRIAL COMPLEX',sky:0x65777d,fog:0x65777d,ground:0x4e5655,wall:0x414b4c,accent:0x59684a},
- {name:'NIGHTFALL // FORWARD BASE',sky:0x293b4a,fog:0x293b4a,ground:0x353d40,wall:0x37413d,accent:0x52634d}
+ {name:'NIGHTFALL // FORWARD BASE',sky:0x293b4a,fog:0x293b4a,ground:0x353d40,wall:0x37413d,accent:0x52634d},{name:'STEEL FANG // CLOSED HANGAR',sky:0x46535a,fog:0x46535a,ground:0x343b3e,wall:0x515b5e,accent:0x8a744c},{name:'BLACKWOOD // DEEP FOREST',sky:0x34483b,fog:0x34483b,ground:0x34402f,wall:0x4b5140,accent:0x526c43},{name:'HIGH PASS // MOUNTAIN RIDGE',sky:0x81909a,fog:0x81909a,ground:0x777b78,wall:0x656c70,accent:0x7b806b}
 ];
 let currentMap=-1;
 function buildMap(round){
@@ -110,7 +110,7 @@ function buildMap(round){
  const ground=new THREE.Mesh(new THREE.PlaneGeometry(150,150),new THREE.MeshStandardMaterial({map:tex,roughness:1}));ground.rotation.x=-Math.PI/2;ground.position.y=-.09;ground.receiveShadow=true;world.add(ground);
  const wall=mat(theme.wall),accent=mat(theme.accent),debris=mat(idx===1?0x9b7954:0x5c625d),steel=mat(0x303b3d,.42,.55);
  // Main combat lanes and map-specific silhouettes.
- if(idx===0||idx===3){
+ if(idx===0){
   building(-15,-13,11,12,5.8,wall);building(15,-14,12,11,6.5,wall);building(-15,14,10,11,4.8,wall);building(15,14,11,12,5.7,wall);
   building(0,-24,17,5,4.3,darkConcrete);building(0,24,17,5,4.3,darkConcrete);
   for(let i=0;i<7;i++){addCrate(-7+i*2.3,-5,1.35);addCrate(6+i*2.2,6,1.25);}
@@ -122,13 +122,16 @@ function buildMap(round){
   building(0,-18,13,7,4.2,wall);building(-8,9,8,7,3.4,accent);building(9,10,7,8,3.8,wall);
    for(let i=0;i<8;i++)addCrate(-17+(i%4)*2.2,2+Math.floor(i/4)*2,1.3);addTank(12,-2);
   for(let i=0;i<9;i++){const rock=new THREE.Mesh(new THREE.DodecahedronGeometry(rand(.8,2.3),1),debris);rock.position.set(rand(-25,25),rand(.3,1),rand(-25,25));rock.scale.y=.55;world.add(rock);}
- }else{
+ }else if(idx===2){
   // Industrial yard: hangar, tanks, loading bays and pipe racks.
   building(0,-20,23,9,7.5,wall);building(-17,4,9,17,5.5,darkConcrete);building(17,5,10,17,5.8,wall);
   for(let x of [-11,-5,5,11]){const tank=new THREE.Mesh(new THREE.CylinderGeometry(2,2,6,20),steel);tank.position.set(x,3,13);tank.castShadow=true;world.add(tank);const cap=new THREE.Mesh(new THREE.CylinderGeometry(2,2,.25,20),accent);cap.position.set(x,6.1,13);world.add(cap);}
   for(let i=0;i<8;i++){addCrate(-20+i*5,-4,1.45);}
    addTank(10,17);
- }
+ }else if(idx===3){building(-13,-18,10,12,5.4,wall);building(13,-18,10,12,5.4,wall);building(-13,17,12,10,4.8,darkConcrete);building(13,17,12,10,4.8,darkConcrete);addTank(0,22);
+ }else if(idx===4){building(0,-18,31,3,8,wall);building(-16,0,3,38,8,wall);building(16,0,3,38,8,wall);box(0,8,0,34,1.1,42,steel);for(let z=-18;z<=18;z+=9)box(0,7.2,z,33,.35,.35,trim);building(-8,-12,9,8,4.2,darkConcrete);building(9,12,10,8,4.5,wall);for(let x of [-10,-4,4,10])addCrate(x,-2,1.5);
+ }else if(idx===5){for(let i=0;i<95;i++){const x=rand(-34,34),z=rand(-34,34);if(Math.hypot(x,z-8)<7)continue;const t=new THREE.Mesh(new THREE.CylinderGeometry(.22,.38,7,7),mat(0x44382b));t.position.set(x,2.5,z);world.add(t);const c=new THREE.Mesh(new THREE.ConeGeometry(2.4,5,7),mat(0x304b32));c.position.set(x,6.2,z);world.add(c);}building(-18,-20,9,7,3.8,wall);building(18,19,8,7,3.5,accent);
+ }else{for(let i=0;i<48;i++){const rock=new THREE.Mesh(new THREE.DodecahedronGeometry(rand(2,5),1),debris);rock.position.set(rand(-36,36),rand(.5,2.4),rand(-36,36));rock.scale.set(1,1.4,1.25);world.add(rock);}building(-20,-17,10,9,4.5,wall);building(20,-17,10,9,4.5,wall);building(0,-27,17,7,5,darkConcrete);addTank(-11,17);}
  for(let i=0;i<180;i++){const x=rand(-36,36),z=rand(-36,36);if(Math.abs(x)<4&&z>0&&z<12)continue;const r=rand(.12,.55);const rock=new THREE.Mesh(new THREE.DodecahedronGeometry(r,0),debris);rock.position.set(x,-.02+r*.25,z);rock.rotation.set(rand(0,3),rand(0,3),rand(0,3));world.add(rock);}
  for(let i=0;i<6;i++){const barrel=new THREE.Mesh(new THREE.CylinderGeometry(.38,.42,1.05,16),mat(idx===1?0x75603f:0x59483b));barrel.position.set(rand(-22,22),.52,rand(-22,22));barrel.castShadow=true;world.add(barrel);}
   // Extra waist-high wooden cover positions, spread through each combat lane.
@@ -183,8 +186,11 @@ for(let i=0;i<7;i++){
 }
 const muzzleLight=new THREE.PointLight(0xffb34e,0,8,1.7);muzzleLight.position.set(.34,-.22,-1.7);weapon.add(muzzleLight);
 weapon.position.set(0,0,0);
+const pistol=new THREE.Group();camera.add(pistol);pistol.visible=false;
+const pbox=(x,y,z,a,b,c,m)=>{const o=new THREE.Mesh(new THREE.BoxGeometry(a,b,c),m);o.position.set(x,y,z);pistol.add(o);};pbox(.34,-.31,-.55,.13,.16,.38,gunMat);pbox(.34,-.4,-.5,.11,.24,.13,gunPolymer);
+function setWeapon(type){player.weaponType=type;weapon.visible=type==='rifle';pistol.visible=type==='pistol';$('weapon-name').textContent=type==='rifle'?'VX-9 RANGER':'M9 SIDEARM';$('weapon-desc').textContent=type==='rifle'?'5.56 × 45 MM // ASSAULT RIFLE':'9 × 19 MM // SEMI-AUTO';$('weapon-slot').textContent=type==='rifle'?'01 / PRIMARY':'02 / SIDEARM';updateHUD();}
 
-const player={health:100,ammo:30,reserve:120,grenades:3,kills:0,shots:0,hits:0,round:1,reloading:false,alive:true,active:true,velocity:new THREE.Vector3(),onGround:true};
+const player={health:100,ammo:30,reserve:120,pistolAmmo:12,pistolReserve:48,rocketAmmo:0,weaponType:'rifle',grenades:3,kills:0,shots:0,hits:0,round:1,reloading:false,alive:true,active:true,velocity:new THREE.Vector3(),onGround:true};
 const bots=[]; const bullets=[]; const enemyBullets=[]; const grenades=[]; const explosions=[]; const bloodParticles=[]; const clock=new THREE.Clock();
 let missionMarker=null,missionKind='eliminate',missionProgress=0,missionDuration=0,missionX=0,missionZ=-8,missionDone=false; const raycaster=new THREE.Raycaster();
 const keys={}; let pointerLocked=false, elapsed=0, roundTime=120, recoil=0, bob=0, shotCooldown=0, toastTimeout;
@@ -398,8 +404,7 @@ function damageBot(bot,amount,impact,source='BULLET'){
 }
 function shoot(){
  if(!player.active||!pointerLocked||player.reloading||shotCooldown>0)return;
- if(player.ammo<=0){toast('MAGAZINE EMPTY // PRESS R');return;}
- player.ammo--;player.shots++;playSound('shot');shotCooldown=.2;recoil=Math.min(recoil+.09,.24);
+ const type=player.weaponType;if(type==='rifle'&&player.ammo<=0&&player.reserve<=0){setWeapon('pistol');toast('RIFLE EMPTY // SIDEARM DRAWN');return;}if(type==='pistol'&&player.pistolAmmo<=0){toast('SIDEARM EMPTY // PRESS R');return;}if(type==='rifle')player.ammo--;else player.pistolAmmo--;player.shots++;playSound('shot');shotCooldown=type==='pistol'?.32:.2;recoil=Math.min(recoil+.09,.24);
  muzzleFlash.visible=true;muzzleLight.intensity=17;
  muzzleFlash.scale.set(rand(.86,1.18),rand(.86,1.18),rand(.9,1.3));
  setTimeout(()=>{muzzleFlash.visible=false;muzzleLight.intensity=0;},72);
@@ -413,7 +418,7 @@ function shoot(){
  scene.add(tracer);setTimeout(()=>{scene.remove(tracer);tracer.geometry.dispose();tracer.material.dispose();},75);
  const targets=[];for(const b of bots)if(b.alive)b.group.traverse(o=>{if(o.isMesh&&!o.userData.noHit&&o.geometry.type!=='PlaneGeometry')targets.push(o);});
  const hit=raycaster.intersectObjects(targets,false)[0];
- if(hit){playSound('hit');const bot=bots.find(b=>{if(!b.alive)return false;let node=hit.object;while(node){if(node===b.group)return true;node=node.parent;}return false;});if(bot){bot.fire=Math.min(bot.fire,.35);player.hits++;damageBot(bot,34,hit.point,'BULLET');$('hit-marker').classList.add('show');setTimeout(()=>$('hit-marker').classList.remove('show'),100);}}
+ if(hit){playSound('hit');const bot=bots.find(b=>{if(!b.alive)return false;let node=hit.object;while(node){if(node===b.group)return true;node=node.parent;}return false;});if(bot){bot.fire=Math.min(bot.fire,.35);player.hits++;damageBot(bot,type==='pistol'?24:34,hit.point,'BULLET');$('hit-marker').classList.add('show');setTimeout(()=>$('hit-marker').classList.remove('show'),100);}}
  updateHUD();
 }
 function throwGrenade(){
@@ -447,7 +452,7 @@ function updateProjectiles(dt){
  for(let i=explosions.length-1;i>=0;i--){const e=explosions[i];e.age+=dt;e.mesh.scale.setScalar(1+e.age*10);e.mesh.material.opacity=Math.max(0,.82-e.age*1.25);if(e.age>.66){scene.remove(e.mesh);e.mesh.geometry.dispose();e.mesh.material.dispose();explosions.splice(i,1);}}
  for(let i=bloodParticles.length-1;i>=0;i--){const p=bloodParticles[i];p.life-=dt;p.velocity.y-=7.5*dt;p.mesh.position.addScaledVector(p.velocity,dt);p.mesh.material.opacity=Math.max(0,p.life/p.maxLife);if(p.mesh.position.y<.025){p.mesh.position.y=.025;p.velocity.set(0,0,0);p.life=Math.min(p.life,.12);}if(p.life<=0){scene.remove(p.mesh);p.mesh.geometry.dispose();p.mesh.material.dispose();bloodParticles.splice(i,1);}}
 }
-function reload(){if(!player.active||player.reloading||player.ammo===30||player.reserve<=0)return;player.reloading=true;playSound('reload');toast('RELOADING');setTimeout(()=>{const amount=Math.min(30-player.ammo,player.reserve);player.ammo+=amount;player.reserve-=amount;player.reloading=false;updateHUD();},1250);}
+function reload(){if(!player.active||player.reloading)return;if(player.weaponType==='pistol'){if(player.pistolAmmo===12||player.pistolReserve<=0)return;player.reloading=true;playSound('reload');toast('SIDEARM RELOAD');setTimeout(()=>{const n=Math.min(12-player.pistolAmmo,player.pistolReserve);player.pistolAmmo+=n;player.pistolReserve-=n;player.reloading=false;updateHUD();},900);return;}if(player.ammo===30||player.reserve<=0){if(player.reserve<=0)setWeapon('pistol');return;}player.reloading=true;playSound('reload');toast('RELOADING');setTimeout(()=>{const n=Math.min(30-player.ammo,player.reserve);player.ammo+=n;player.reserve-=n;player.reloading=false;updateHUD();},1250);}
 function togglePause(){if(!player.active||!player.alive)return;if(pointerLocked){document.exitPointerLock();}else{canvas.requestPointerLock?.();}}
 function begin(){initAudio();startScreen.classList.add('hidden');player.active=true;spawnWave();canvas.requestPointerLock?.();toast('OPERATION LIVE // GOOD HUNT');}
 $('deploy-btn').addEventListener('click',begin);$('resume-btn').addEventListener('click',()=>canvas.requestPointerLock?.());
@@ -456,7 +461,7 @@ $('retry-btn').addEventListener('click',()=>{gameoverScreen.classList.add('hidde
 canvas.addEventListener('click',()=>{if(!pointerLocked&&player.active&&player.alive)canvas.requestPointerLock?.();});
 document.addEventListener('pointerlockchange',()=>{pointerLocked=document.pointerLockElement===canvas;if(!pointerLocked&&player.active&&player.alive&&!startScreen.classList.contains('hidden'))return;if(!pointerLocked&&player.active&&player.alive){pauseScreen.classList.remove('hidden');}else{pauseScreen.classList.add('hidden');}});
 document.addEventListener('mousemove',e=>{if(!pointerLocked||!player.active)return;camera.rotation.order='YXZ';camera.rotation.y-=e.movementX*.0022;camera.rotation.x-=e.movementY*.0022;camera.rotation.x=THREE.MathUtils.clamp(camera.rotation.x,-1.35,1.35);});
-document.addEventListener('mousedown',e=>{if(e.button===0)shoot();if(e.button===2){e.preventDefault();throwGrenade();}});canvas.addEventListener('contextmenu',e=>e.preventDefault());document.addEventListener('keydown',e=>{keys[e.code]=true;if(e.code==='KeyR')reload();if(e.code==='KeyG')throwGrenade();if(e.code==='Escape'&&pointerLocked){};});document.addEventListener('keyup',e=>keys[e.code]=false);
+document.addEventListener('mousedown',e=>{if(e.button===0)shoot();if(e.button===2){e.preventDefault();throwGrenade();}});canvas.addEventListener('contextmenu',e=>e.preventDefault());document.addEventListener('keydown',e=>{keys[e.code]=true;if(e.code==='KeyR')reload();if(e.code==='Digit1')setWeapon('rifle');if(e.code==='Digit2')setWeapon('pistol');if(e.code==='KeyG')throwGrenade();if(e.code==='Escape'&&pointerLocked){};});document.addEventListener('keyup',e=>keys[e.code]=false);
 window.addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();const ratio=Math.min(window.devicePixelRatio||1,1.15);renderer.setPixelRatio(ratio);renderer.setSize(innerWidth,innerHeight,false);});
 let contextLost=false;
 canvas.addEventListener('webglcontextlost',event=>{event.preventDefault();contextLost=true;player.active=false;pauseScreen.classList.add('hidden');toast('GRAPHICS PAUSED // RESTORING WEBGL');});

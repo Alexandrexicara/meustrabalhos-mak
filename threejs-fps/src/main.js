@@ -371,7 +371,7 @@ function unlockExitRoute(){
 function updateCampaignRoute(dt){
  const panel=$('route-compass');if(!routeActive||!routeMarker){panel.classList.add('hidden');return;}
  panel.classList.remove('hidden');const dx=routeMarker.position.x-camera.position.x,dz=routeMarker.position.z-camera.position.z,dist=Math.hypot(dx,dz);
- const bearing=Math.atan2(dx,-dz),relative=bearing-camera.rotation.y;const arrow=$('route-arrow');arrow.style.transform='rotate('+relative+'rad)';$('route-distance').textContent=Math.ceil(dist)+' M';$('route-label').textContent='NEXT OPERATION';
+ const bearing=Math.atan2(dx,-dz),relative=bearing+camera.rotation.y;const arrow=$('route-arrow');arrow.style.transform='rotate('+relative+'rad)';$('route-distance').textContent=Math.ceil(dist)+' M';$('route-label').textContent='NEXT OPERATION';
  if(routeMarker)routeMarker.rotation.y+=dt*.55;
  if(dist<3.2){
   routeActive=false;panel.classList.add('hidden');if(routeMarker){world.remove(routeMarker);routeMarker=null;}
@@ -592,7 +592,7 @@ function update(dt){
  for(const v of combatVehicles){v.fire-=dt;const target=new THREE.Vector3(camera.position.x-v.tank.position.x,0,camera.position.z-v.tank.position.z);v.turret.rotation.y=Math.atan2(target.x,target.z)-v.tank.rotation.y;if(v.fire<=0&&player.active){v.fire=rand(4,7);const start=v.tank.position.clone().add(new THREE.Vector3(0,2,0));const dir=new THREE.Vector3(camera.position.x-start.x,camera.position.y-start.y,camera.position.z-start.z).normalize();const shell=new THREE.Mesh(new THREE.SphereGeometry(.13,8,6),new THREE.MeshBasicMaterial({color:0xffa34d}));shell.position.copy(start);scene.add(shell);enemyBullets.push({mesh:shell,velocity:dir.multiplyScalar(22),life:1.8,damage:16});}}
  shotCooldown=Math.max(0,shotCooldown-dt);recoil=Math.max(0,recoil-dt*.55);
  if(player.active&&player.alive){
-  roundTime-=dt;if(roundTime<=0){roundTime=0;damagePlayer(12);roundTime=12;}updateTimer();
+  if(!routeActive){roundTime-=dt;if(roundTime<=0){roundTime=0;damagePlayer(12);roundTime=12;}updateTimer();}
   const forward=new THREE.Vector3(0,0,-1).applyQuaternion(camera.quaternion);forward.y=0;forward.normalize();const right=new THREE.Vector3().crossVectors(forward,new THREE.Vector3(0,1,0)).normalize();
   const move=new THREE.Vector3();if(keys.KeyW)move.add(forward);if(keys.KeyS)move.sub(forward);if(keys.KeyD)move.add(right);if(keys.KeyA)move.sub(right);
   if(move.lengthSq()>0){if(elapsed-lastStepSound>.38){playSound('step');lastStepSound=elapsed;}move.normalize();const speed=(keys.ShiftLeft||keys.ShiftRight)?8.5:5.2;const nx=camera.position.x+move.x*speed*dt,nz=camera.position.z+move.z*speed*dt;if(!moveBlocked(nx,camera.position.z))camera.position.x=nx;if(!moveBlocked(camera.position.x,nz))camera.position.z=nz;bob+=dt*speed;}

@@ -67,7 +67,17 @@ building(0,-22,15,5,4.2,darkConcrete); building(0,22,15,5,4.2,darkConcrete);
 for(let i=0;i<5;i++){box(-5+i*2.5,.7,-5,1.6,1.4,1.6,green);box(6+i*2.3,.55,5,1.4,1.1,1.4,darkConcrete);}
 for(let i=0;i<7;i++){const x=-22+i*7;box(x,1.15,-1,.22,2.3,.22,metal);box(x,2.35,-1,.5,.12,.5,trim,false);}
 for(let i=0;i<10;i++){const a=i*Math.PI*2/10;const x=Math.cos(a)*29,z=Math.sin(a)*29;box(x,1.2,z,.45,2.4,.45,metal);box(x,2.45,z,.7,.12,.7,trim,false);}
+
 const skyHaze = new THREE.Mesh(new THREE.PlaneGeometry(100,18),new THREE.MeshBasicMaterial({color:0xc1c5b3,transparent:true,opacity:.18,side:THREE.DoubleSide}));skyHaze.position.set(0,11,-38);scene.add(skyHaze);
+// Distant patrol aircraft: a small, low-cost silhouette that crosses the skyline.
+const patrolAircraft=new THREE.Group();
+const aircraftBody=mat(0x39413d,.72,.18),aircraftGlass=mat(0x182b32,.25,.45);
+const fuselage=new THREE.Mesh(new THREE.CylinderGeometry(.12,.18,2.9,10),aircraftBody);fuselage.rotation.z=Math.PI/2;patrolAircraft.add(fuselage);
+const wings=new THREE.Mesh(new THREE.BoxGeometry(.18,.055,2.25),aircraftBody);patrolAircraft.add(wings);
+const tailWing=new THREE.Mesh(new THREE.BoxGeometry(.14,.045,.85),aircraftBody);tailWing.position.x=-1.12;patrolAircraft.add(tailWing);
+const tailFin=new THREE.Mesh(new THREE.BoxGeometry(.32,.36,.06),aircraftBody);tailFin.position.set(-1.18,.16,0);patrolAircraft.add(tailFin);
+const cockpit=new THREE.Mesh(new THREE.SphereGeometry(.14,10,8),aircraftGlass);cockpit.scale.set(1.5,.7,.9);cockpit.position.x=.62;patrolAircraft.add(cockpit);
+patrolAircraft.scale.set(1.15,1.15,1.15);patrolAircraft.position.set(-48,19,-34);scene.add(patrolAircraft);
 
 const weapon = new THREE.Group(); camera.add(weapon); scene.add(camera);
 const gunMat=mat(0x202b2d,.4,.6), gunAccent=mat(0x65734f,.5,.2);
@@ -185,7 +195,7 @@ function updateBots(dt){
 }
 function updateRadar(){const root=$('radar-dots');root.innerHTML='';for(const b of bots){if(!b.alive)continue;const dx=(b.group.position.x-camera.position.x)/55*130,dz=(b.group.position.z-camera.position.z)/55*130;const dot=document.createElement('i');dot.className='radar-dot';dot.style.left='calc(50% + '+THREE.MathUtils.clamp(dx,-62,62)+'px)';dot.style.top='calc(50% + '+THREE.MathUtils.clamp(dz,-62,62)+'px)';root.append(dot);}}
 function update(dt){
- elapsed+=dt;shotCooldown=Math.max(0,shotCooldown-dt);recoil=Math.max(0,recoil-dt*.55);
+ elapsed+=dt;patrolAircraft.position.x=((elapsed*3.1+48)%110)-55;patrolAircraft.position.y=19+Math.sin(elapsed*.22)*.35;patrolAircraft.position.z=-34+Math.sin(elapsed*.12)*2;shotCooldown=Math.max(0,shotCooldown-dt);recoil=Math.max(0,recoil-dt*.55);
  if(player.active&&player.alive){
   roundTime-=dt;if(roundTime<=0){roundTime=0;damagePlayer(12);roundTime=12;}updateTimer();
   const forward=new THREE.Vector3(0,0,-1).applyQuaternion(camera.quaternion);forward.y=0;forward.normalize();const right=new THREE.Vector3().crossVectors(forward,new THREE.Vector3(0,1,0)).normalize();

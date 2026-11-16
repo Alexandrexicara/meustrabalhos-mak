@@ -194,7 +194,7 @@ function collectSupplyPickups(){for(let i=supplyPickups.length-1;i>=0;i--){const
 
 const player={health:100,ammo:30,reserve:120,pistolAmmo:12,pistolReserve:48,rocketAmmo:0,weaponType:'rifle',grenades:3,kills:0,shots:0,hits:0,round:1,reloading:false,alive:true,active:true,velocity:new THREE.Vector3(),onGround:true};
 const bots=[]; const bullets=[]; const enemyBullets=[]; const grenades=[]; const explosions=[]; const bloodParticles=[]; const clock=new THREE.Clock();
-let missionMarker=null,missionKind='eliminate',missionProgress=0,missionDuration=0,missionX=0,missionZ=-8,missionDone=false; const raycaster=new THREE.Raycaster();
+let missionMarker=null,routeMarker=null,routeActive=false,missionKind='eliminate',missionProgress=0,missionDuration=0,missionX=0,missionZ=-8,missionDone=false; const raycaster=new THREE.Raycaster();
 const keys={}; let pointerLocked=false, elapsed=0, roundTime=120, recoil=0, bob=0, shotCooldown=0, toastTimeout;
 const $=id=>document.getElementById(id);
 const startScreen=$('start-screen'),pauseScreen=$('pause-screen'),roundScreen=$('round-screen'),gameoverScreen=$('gameover-screen');
@@ -326,7 +326,7 @@ function makeBot(index){
  if(soldierTemplate)attachSoldier(bot);return bot;
 }
 function spawnWave(){
- buildMap(player.round);spawnSupplyPickups();for(const b of bots)scene.remove(b.group);bots.length=0;
+ routeActive=false;if(routeMarker){world.remove(routeMarker);routeMarker=null;}buildMap(player.round);spawnSupplyPickups();for(const b of bots)scene.remove(b.group);bots.length=0;
  const count=Math.min(18+(player.round-1)*4,40);for(let i=0;i<count;i++)makeBot(i);
  $('wave').textContent=String(count).padStart(2,'0');$('radar-count').textContent=String(count).padStart(2,'0');
  $('round-label').textContent='ROUND '+String(player.round).padStart(2,'0');
@@ -348,12 +348,33 @@ function spawnWave(){
  }
  roundTime=Math.max(55,120-player.round*4);updateTimer();toast('FRAG READY // G OR RIGHT CLICK');
 }
+function unlockExitRoute(){
+ if(routeActive)return;routeActive=true;missionDone=true;
+ if(missionMarker){world.remove(missionMarker);missionMarker=null;}
+ const exitX=0,exitZ=-32;routeMarker=new THREE.Group();routeMarker.position.set(exitX,0,exitZ);
+ const ring=new THREE.Mesh(new THREE.TorusGeometry(3,.12,10,48),new THREE.MeshBasicMaterial({color:0x7dffb2}));ring.rotation.x=-Math.PI/2;ring.position.y=.1;routeMarker.add(ring);
+ const beam=new THREE.Mesh(new THREE.CylinderGeometry(.12,.8,7,18,1,true),new THREE.MeshBasicMaterial({color:0x7dffb2,transparent:true,opacity:.2,side:THREE.DoubleSide,depthWrite:false}));beam.position.y=3.5;routeMarker.add(beam);
+ const beacon=new THREE.PointLight(0x7dffb2,3,18);beacon.position.y=2.4;routeMarker.add(beacon);world.add(routeMarker);
+ $('objective').textContent='PROCEED TO THE NEXT OPERATION';$('objective-sub').textContent='FOLLOW THE COMPASS // REACH THE EXTRACTION ROUTE';$('match-state').textContent='EXTRACTION ROUTE OPEN';toast('MISSION COMPLETE // FOLLOW THE ROUTE MARKER');
+}
+function updateCampaignRoute(dt){
+ const panel=$('route-compass');if(!routeActive||!routeMarker){panel.classList.add('hidden');return;}
+ panel.classList.remove('hidden');const dx=routeMarker.position.x-camera.position.x,dz=routeMarker.position.z-camera.position.z,dist=Math.hypot(dx,dz);
+ const bearing=Math.atan2(dx,-dz),relative=bearing-camera.rotation.y;const arrow=$('route-arrow');arrow.style.transform='rotate('+relative+'rad)';$('route-distance').textContent=Math.ceil(dist)+' M';$('route-label').textContent='NEXT OPERATION';
+ if(routeMarker)routeMarker.rotation.y+=dt*.55;
+ if(dist<3.2){
+  routeActive=false;panel.classList.add('hidden');if(routeMarker){world.remove(routeMarker);routeMarker=null;}
+  player.round++;player.health=Math.min(100,player.health+18);player.ammo=30;player.reserve+=30;player.grenades=Math.min(5,player.grenades+1);
+  camera.position.set(0,1.72,8);camera.rotation.set(0,0,0);player.velocity.set(0,0,0);player.onGround=true;
+  spawnWave();updateHUD();toast('NEW OPERATION // '+mapThemes[currentMap].name);return;
+ }
+}
 function updateMission(dt){
  if(missionDone)return;
  const remaining=bots.filter(b=>b.alive).length;
  if(missionKind==='eliminate'){
   $('objective-sub').textContent=remaining>0?'ELIMINATE HOSTILES // '+remaining+' REMAIN':'ALL HOSTILES ELIMINATED // SECTOR CLEAR';
-  if(remaining===0){missionDone=true;$('objective-sub').textContent='SETOR LIMPO // OPERAÇÃO CONCLUÍDA — PREPARE-SE PARA A PRÓXIMA FASE';toast('SECTOR CLEAR // NEXT OPERATION READY');}
+  if(remaining===0){unlockExitRoute();}
   return;
  }
  if(remaining>0){
@@ -367,7 +388,7 @@ function updateMission(dt){
  else if(missionKind==='defend')missionProgress=Math.max(0,missionProgress-dt*.55);
  const pct=Math.floor(missionProgress/missionDuration*100);
  $('objective-sub').textContent=inside?'SECURING OBJECTIVE // '+pct+'%':'GO TO BEACON // '+Math.ceil(distance)+' M';
- if(missionProgress>=missionDuration){missionDone=true;toast('OBJECTIVE COMPLETE // NEXT OPERATION READY');$('objective-sub').textContent='OBJETIVO CONCLUÍDO // PRÓXIMA FASE LIBERADA';}
+ if(missionProgress>=missionDuration){unlockExitRoute();}
 }
 function updateTimer(){const m=Math.floor(roundTime/60),s=Math.floor(roundTime%60);$('round-timer').textContent=String(m).padStart(2,'0')+':'+String(s).padStart(2,'0');}
 function updateHUD(){
@@ -569,8 +590,7 @@ function update(dt){
   if(player.onGround){camera.position.y=THREE.MathUtils.damp(camera.position.y,eyeHeight,18,dt);if(Math.abs(camera.position.y-eyeHeight)<.015)camera.position.y=eyeHeight;}
   else{camera.position.y+=player.velocity.y*dt;if(camera.position.y<=eyeHeight){camera.position.y=eyeHeight;player.velocity.y=0;player.onGround=true;}}
   weapon.position.y=Math.sin(bob*1.7)*.012-recoil*.5+(crouched?-.22:0);weapon.position.x=Math.cos(bob*.85)*.008;weapon.rotation.x=-recoil+(crouched?.035:0);
-  updateBots(dt);updateProjectiles(dt);collectSupplyPickups();updateMission(dt);
-  if(bots.every(b=>!b.alive)&&missionDone){playSound('round');player.active=false;document.exitPointerLock?.();$('round-eyebrow').textContent='SECTOR SECURED';$('round-title').textContent='ROUND COMPLETE';$('round-copy').textContent=mapThemes[currentMap].name+' secured. '+player.kills+' hostile units neutralized. Próxima fase: novo mapa, mais inimigos e novo objetivo. Pressione NEXT OPERATION para continuar.';roundScreen.classList.remove('hidden');}
+  updateBots(dt);updateProjectiles(dt);collectSupplyPickups();updateMission(dt);updateCampaignRoute(dt);
   if(Math.floor(elapsed*3)%2===0)updateRadar();
  }
  $('clock').textContent=String(Math.floor(elapsed/60)).padStart(2,'0')+':'+String(Math.floor(elapsed%60)).padStart(2,'0');

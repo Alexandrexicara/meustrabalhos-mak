@@ -47,7 +47,7 @@ const mat = (color, roughness = .85, metalness = 0) => new THREE.MeshStandardMat
 const concrete = mat(0x66716c), darkConcrete = mat(0x3b4948), sand = mat(0x9a927e), metal = mat(0x29383b, .45, .55), trim = mat(0x1b282b), green = mat(0x687d59), glass = new THREE.MeshStandardMaterial({ color:0x76969a, roughness:.25, metalness:.5 });
 // Mission maps: three distinct environments built as real 3D geometry.
 const world=new THREE.Group();scene.add(world);
-const colliders=[];
+const colliders=[];const destructibleCrates=[];const crateDebris=[];
 function box(x,y,z,sx,sy,sz,material,collide=true){
  const m=new THREE.Mesh(new THREE.BoxGeometry(sx,sy,sz),material);m.position.set(x,y,z);m.castShadow=true;m.receiveShadow=true;world.add(m);
  if(collide)colliders.push({x,z,hx:sx/2,hz:sz/2,top:y+sy/2});return m;
@@ -64,18 +64,35 @@ function building(x,z,w,d,h,material=concrete){
 let crateWoodTexture=null;
 function addCrate(x,z,size=1.35){
  if(!crateWoodTexture){
-  const canvas=document.createElement('canvas');canvas.width=canvas.height=256;const ctx=canvas.getContext('2d');
-  ctx.fillStyle='#765034';ctx.fillRect(0,0,256,256);
-  for(let y=0;y<256;y+=32){ctx.fillStyle=y%64?'#805b38':'#67452d';ctx.fillRect(0,y,256,29);ctx.strokeStyle='rgba(35,22,12,.5)';ctx.lineWidth=2;ctx.strokeRect(0,y,256,29);
-   for(let n=0;n<24;n++){const xx=Math.random()*256,yy=y+Math.random()*28;ctx.strokeStyle='rgba(211,164,105,'+(Math.random()*.22)+')';ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(xx,yy);ctx.lineTo(xx+rand(8,42),yy+(Math.random()-.5)*3);ctx.stroke();}}
+  const canvas=document.createElement('canvas');canvas.width=canvas.height=256;const ctx=canvas.getContext('2d');ctx.fillStyle='#765034';ctx.fillRect(0,0,256,256);
+  for(let y=0;y<256;y+=32){ctx.fillStyle=y%64?'#805b38':'#67452d';ctx.fillRect(0,y,256,29);ctx.strokeStyle='rgba(35,22,12,.5)';ctx.lineWidth=2;ctx.strokeRect(0,y,256,29);for(let n=0;n<24;n++){const xx=Math.random()*256,yy=y+Math.random()*28;ctx.strokeStyle='rgba(211,164,105,'+(Math.random()*.22)+')';ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(xx,yy);ctx.lineTo(xx+rand(8,42),yy+(Math.random()-.5)*3);ctx.stroke();}}
   crateWoodTexture=new THREE.CanvasTexture(canvas);crateWoodTexture.colorSpace=THREE.SRGBColorSpace;crateWoodTexture.wrapS=crateWoodTexture.wrapT=THREE.RepeatWrapping;
  }
- const wood=new THREE.MeshStandardMaterial({map:crateWoodTexture,roughness:.92}),edge=mat(0x382b20),c=box(x,size*.48,z,size,size*.96,size,wood,true);
- for(let k=-1;k<=1;k++){box(x+k*size*.29,size*.48,z-size*.505,.075,size*.9,.055,edge,false);box(x,size*.48,z+k*size*.29,size*.9,size*.9,.055,edge,false);}
- const brace=box(x,size*.48,z-size*.54,size*.82,.09,.06,edge,false);brace.rotation.z=.62;
- // Solid crate collision: player and hostiles can actually use it as cover.
- colliders.push({x,z,hx:size*.58,hz:size*.58,top:size*.96});
- return c;
+ const group=new THREE.Group();group.position.set(x,0,z);group.name='destructible-wooden-cover';
+ const wood=new THREE.MeshStandardMaterial({map:crateWoodTexture,roughness:.94}),edge=mat(0x382b20);
+ const add=(geo,material,pos)=>{const m=new THREE.Mesh(geo,material);m.position.set(...pos);m.castShadow=true;m.receiveShadow=true;group.add(m);return m;};
+ add(new THREE.BoxGeometry(size,size*.96,size),wood,[0,size*.48,0]);
+ for(let k=-1;k<=1;k++){add(new THREE.BoxGeometry(.075,size*.9,.055),edge,[k*size*.29,size*.48,-size*.505]);add(new THREE.BoxGeometry(size*.9,size*.9,.055),edge,[0,size*.48,k*size*.29]);}
+ const brace=add(new THREE.BoxGeometry(size*.82,.09,.06),edge,[0,size*.48,-size*.54]);brace.rotation.z=.62;
+ world.add(group);
+ const collider={x,z,hx:size*.58,hz:size*.58,top:size*.96,crate:group};colliders.push(collider);
+ const record={group,collider,x,z,size,health:100,maxHealth:100,alive:true,marks:[]};group.userData.destructible=record;destructibleCrates.push(record);return group;
+}
+function markCrateImpact(crate,point,normal){
+ const local=crate.group.worldToLocal(point.clone()),n=normal.clone().normalize(),mark=new THREE.Group();mark.position.copy(local).addScaledVector(n,.012);mark.quaternion.setFromUnitVectors(new THREE.Vector3(0,0,1),n);crate.group.add(mark);
+ const dark=new THREE.MeshBasicMaterial({color:0x17130f,transparent:true,opacity:.82,depthWrite:false,side:THREE.DoubleSide});mark.add(new THREE.Mesh(new THREE.CircleGeometry(.035+Math.random()*.018,8),dark));
+ for(let k=0;k<3;k++){const splinter=new THREE.Mesh(new THREE.BoxGeometry(.012,.09+Math.random()*.08,.008),new THREE.MeshStandardMaterial({color:k%2?0x4c2f1d:0xa47b4b,roughness:1}));splinter.position.set((Math.random()-.5)*.1,(Math.random()-.5)*.1,.004);splinter.rotation.z=Math.random()*Math.PI;splinter.castShadow=true;mark.add(splinter);}crate.marks.push(mark);
+}
+function destroyCrate(crate){
+ if(!crate.alive)return;crate.alive=false;world.remove(crate.group);const ci=colliders.indexOf(crate.collider);if(ci>=0)colliders.splice(ci,1);
+ for(let i=0;i<11;i++){const size=rand(.12,.34),piece=new THREE.Mesh(new THREE.BoxGeometry(size,rand(.08,.2),rand(.08,.22)),new THREE.MeshStandardMaterial({color:i%2?0x765034:0x9a7047,roughness:.96}));piece.position.set(crate.x+rand(-.6,.6),rand(.25,.95),crate.z+rand(-.6,.6));piece.rotation.set(rand(-1,1),rand(0,6),rand(-1,1));piece.castShadow=true;world.add(piece);crateDebris.push({mesh:piece,velocity:new THREE.Vector3(rand(-3,3),rand(1.5,5),rand(-3,3)),spin:new THREE.Vector3(rand(-5,5),rand(-5,5),rand(-5,5)),life:rand(3,5)});}
+ const dust=new THREE.Mesh(new THREE.SphereGeometry(.5,10,8),new THREE.MeshBasicMaterial({color:0x9b7957,transparent:true,opacity:.35,depthWrite:false}));dust.position.set(crate.x,.5,crate.z);world.add(dust);explosions.push({mesh:dust,age:0});
+}
+function damageCrate(crate,amount,point,normal){
+ if(!crate.alive)return;crate.health=Math.max(0,crate.health-amount);if(point&&normal)markCrateImpact(crate,point,normal);if(crate.health<=0)destroyCrate(crate);
+}
+function damageCratesInBlast(center,radius,damage){
+ for(const crate of destructibleCrates){if(!crate.alive)continue;const d=Math.hypot(crate.x-center.x,crate.z-center.z);if(d<radius)damageCrate(crate,damage*(1-d/radius));}
 }
 const combatVehicles=[];
 function addTank(x,z){
@@ -100,7 +117,7 @@ let currentMap=-1;
 function buildMap(round){
  const idx=(round-1)%mapThemes.length,theme=mapThemes[idx];currentMap=idx;
  world.clear();
- colliders.length=0;combatVehicles.length=0;
+ colliders.length=0;destructibleCrates.length=0;crateDebris.length=0;combatVehicles.length=0;
  scene.background=new THREE.Color(theme.sky);scene.fog=new THREE.Fog(theme.fog,34,132);
  const floorCanvas=document.createElement('canvas');floorCanvas.width=floorCanvas.height=512;
  const ctx=floorCanvas.getContext('2d');ctx.fillStyle='#'+theme.ground.toString(16).padStart(6,'0');ctx.fillRect(0,0,512,512);
@@ -488,7 +505,9 @@ function shoot(){
  scene.add(tracer);setTimeout(()=>{scene.remove(tracer);tracer.geometry.dispose();tracer.material.dispose();},75);
  const targets=[];for(const b of bots)if(b.alive)b.group.traverse(o=>{if(o.isMesh&&!o.userData.noHit&&o.geometry.type!=='PlaneGeometry')targets.push(o);});
  const hit=raycaster.intersectObjects(targets,false)[0];
- if(hit){playSound('hit');const bot=bots.find(b=>{if(!b.alive)return false;let node=hit.object;while(node){if(node===b.group)return true;node=node.parent;}return false;});if(bot){bot.fire=Math.min(bot.fire,.35);player.hits++;const damage=type==='pistol'?24:type==='launcher'?150:34;damageBot(bot,damage,hit.point,type==='launcher'?'ROCKET':'BULLET');if(type==='launcher'){const blast=new THREE.Mesh(new THREE.SphereGeometry(1,14,10),new THREE.MeshBasicMaterial({color:0xff9a42,transparent:true,opacity:.65,depthWrite:false}));blast.position.copy(hit.point);scene.add(blast);explosions.push({mesh:blast,age:0});for(const other of bots){const d=other.group.position.distanceTo(hit.point);if(other!==bot&&other.alive&&d<8)damageBot(other,Math.round(150*(1-d/8)),hit.point,'ROCKET');}}$('hit-marker').classList.add('show');setTimeout(()=>$('hit-marker').classList.remove('show'),100);}}
+ const crateHits=raycaster.intersectObjects(destructibleCrates.filter(c=>c.alive).flatMap(c=>c.group.children),false);const crateHit=crateHits[0];
+ if(crateHit&&(!hit||crateHit.distance<hit.distance)){const owner=destructibleCrates.find(c=>c.alive&&c.group===crateHit.object.parent);const normal=crateHit.face?crateHit.face.normal.clone().transformDirection(crateHit.object.matrixWorld):new THREE.Vector3(0,0,1);if(owner)damageCrate(owner,type==='launcher'?100:type==='pistol'?7:12,crateHit.point,normal);if(type==='launcher'){damageCratesInBlast(crateHit.point,7,150);const blast=new THREE.Mesh(new THREE.SphereGeometry(.8,14,10),new THREE.MeshBasicMaterial({color:0xff9a42,transparent:true,opacity:.65,depthWrite:false}));blast.position.copy(crateHit.point);scene.add(blast);explosions.push({mesh:blast,age:0});}}
+ else if(hit){playSound('hit');const bot=bots.find(b=>{if(!b.alive)return false;let node=hit.object;while(node){if(node===b.group)return true;node=node.parent;}return false;});if(bot){bot.fire=Math.min(bot.fire,.35);player.hits++;const damage=type==='pistol'?24:type==='launcher'?150:34;damageBot(bot,damage,hit.point,type==='launcher'?'ROCKET':'BULLET');if(type==='launcher'){const blast=new THREE.Mesh(new THREE.SphereGeometry(1,14,10),new THREE.MeshBasicMaterial({color:0xff9a42,transparent:true,opacity:.65,depthWrite:false}));blast.position.copy(hit.point);scene.add(blast);explosions.push({mesh:blast,age:0});for(const other of bots){const d=other.group.position.distanceTo(hit.point);if(other!==bot&&other.alive&&d<8)damageBot(other,Math.round(150*(1-d/8)),hit.point,'ROCKET');}}$('hit-marker').classList.add('show');setTimeout(()=>$('hit-marker').classList.remove('show'),100);}}
  if(type==='launcher')setWeapon('rifle');
  updateHUD();
 }
@@ -502,7 +521,7 @@ function throwGrenade(){
  grenade.castShadow=true;scene.add(grenade);grenades.push({mesh:grenade,velocity,fuse:2.15,bounced:false});
 }
 function detonateGrenade(g){
- const center=g.mesh.position.clone();scene.remove(g.mesh);playSound('explosion');
+ const center=g.mesh.position.clone();scene.remove(g.mesh);playSound('explosion');damageCratesInBlast(center,7,145);
  const flash=new THREE.Mesh(new THREE.SphereGeometry(.5,16,12),new THREE.MeshBasicMaterial({color:0xffa34d,transparent:true,opacity:.82,depthWrite:false}));
  flash.position.copy(center);scene.add(flash);explosions.push({mesh:flash,age:0});
  for(const bot of bots){if(!bot.alive)continue;const target=bot.group.position.clone().add(new THREE.Vector3(0,.85,0));const d=target.distanceTo(center);if(d<9){const damage=Math.max(0,Math.round(190*Math.pow(1-d/9,1.35)));if(damage>0)damageBot(bot,damage,target,'FRAG');}}
@@ -520,6 +539,7 @@ function updateProjectiles(dt){
   if(b.mesh.position.distanceTo(camera.position)<.48){damagePlayer(b.damage);b.life=-1;}
   if(b.life<=0){scene.remove(b.mesh);enemyBullets.splice(i,1);}
  }
+ for(let i=crateDebris.length-1;i>=0;i--){const d=crateDebris[i];d.life-=dt;d.velocity.y-=9.8*dt;d.mesh.position.addScaledVector(d.velocity,dt);d.mesh.rotation.x+=d.spin.x*dt;d.mesh.rotation.y+=d.spin.y*dt;d.mesh.rotation.z+=d.spin.z*dt;if(d.mesh.position.y<.06){d.mesh.position.y=.06;d.velocity.y=Math.abs(d.velocity.y)*.22;d.velocity.x*=.55;d.velocity.z*=.55;}if(d.life<=0){world.remove(d.mesh);d.mesh.geometry.dispose();d.mesh.material.dispose();crateDebris.splice(i,1);}}
  for(let i=explosions.length-1;i>=0;i--){const e=explosions[i];e.age+=dt;e.mesh.scale.setScalar(1+e.age*10);e.mesh.material.opacity=Math.max(0,.82-e.age*1.25);if(e.age>.66){scene.remove(e.mesh);e.mesh.geometry.dispose();e.mesh.material.dispose();explosions.splice(i,1);}}
  for(let i=bloodParticles.length-1;i>=0;i--){const p=bloodParticles[i];p.life-=dt;p.velocity.y-=7.5*dt;p.mesh.position.addScaledVector(p.velocity,dt);p.mesh.material.opacity=Math.max(0,p.life/p.maxLife);if(p.mesh.position.y<.025){p.mesh.position.y=.025;p.velocity.set(0,0,0);p.life=Math.min(p.life,.12);}if(p.life<=0){scene.remove(p.mesh);p.mesh.geometry.dispose();p.mesh.material.dispose();bloodParticles.splice(i,1);}}
 }

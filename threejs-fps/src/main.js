@@ -53,9 +53,32 @@ function box(x,y,z,sx,sy,sz,material,collide=true){
  if(collide)colliders.push({x,z,hx:sx/2,hz:sz/2,top:y+sy/2});return m;
 }
 function building(x,z,w,d,h,material=concrete){
+ // House-like silhouette: walls, pitched roof, door, window frames and visible glass.
  box(x,h/2,z,w,h,d,material);
- box(x,h+.08,z,w+.18,.16,d+.18,trim,false);
- for(let i=-1;i<=1;i++)box(x+i*w*.28,h*.58,z-d/2-.012,w*.13,h*.2,.025,glass,false);
+ const roofMat=mat(0x493b32,.94),roofA=new THREE.Mesh(new THREE.BoxGeometry(w*.56,.22,d+.65),roofMat),roofB=new THREE.Mesh(new THREE.BoxGeometry(w*.56,.22,d+.65),roofMat);
+ roofA.position.set(x-w*.25,h+.34,z);roofB.position.set(x+w*.25,h+.34,z);roofA.rotation.z=-.48;roofB.rotation.z=.48;world.add(roofA,roofB);roofA.castShadow=roofB.castShadow=true;
+ const door=box(x-w*.22,.98,z-d/2-.04,.85,1.95,.12,trim,false);door.material=mat(0x30271f);
+ for(let side of [-1,1]){const wx=x+side*w*.24;box(wx,h*.57,z-d/2-.075,w*.19,h*.23,.08,glass,false);box(wx,h*.57,z-d/2-.13,.09,h*.29,.06,trim,false);box(wx,h*.57,z-d/2-.13,w*.22,.07,.06,trim,false);}
+ box(x,h+.03,z,w+.12,.12,d+.12,trim,false);
+}
+function addCrate(x,z,size=1.35){
+ const wood=mat(0x765336),edge=mat(0x382b20),c=box(x,size*.48,z,size,size*.96,size,wood,true);
+ for(let k=-1;k<=1;k++){box(x+k*size*.29,size*.48,z-size*.505,.075,size*.9,.055,edge,false);box(x,size*.48,z+k*size*.29,size*.9,size*.9,.055,edge,false);}
+ const brace=box(x,size*.48,z-size*.54,size*.82,.09,.06,edge,false);brace.rotation.z=.62;
+ return c;
+}
+const combatVehicles=[];
+function addTank(x,z){
+ const tank=new THREE.Group(),olive=mat(0x46513b,.82,.25),dark=mat(0x202722,.9,.15),steel=mat(0x343b36,.5,.55);
+ const hull=new THREE.Mesh(new THREE.BoxGeometry(4.2,1.05,2.55),olive);hull.position.y=.95;hull.castShadow=true;tank.add(hull);
+ const glacis=new THREE.Mesh(new THREE.BoxGeometry(3.7,.48,2.5),olive);glacis.position.set(0,1.55,.05);glacis.rotation.x=-.12;tank.add(glacis);
+ for(const side of [-1,1]){const track=new THREE.Mesh(new THREE.BoxGeometry(4.55,.72,.48),dark);track.position.set(0,.55,side*1.42);tank.add(track);for(let n=0;n<6;n++){const wheel=new THREE.Mesh(new THREE.CylinderGeometry(.32,.32,.18,16),steel);wheel.rotation.x=Math.PI/2;wheel.position.set(-1.65+n*.66,.55,side*1.69);tank.add(wheel);}}
+ const turret=new THREE.Group();turret.position.set(-.15,1.8,0);tank.add(turret);
+ const body=new THREE.Mesh(new THREE.CylinderGeometry(.98,1.15,.62,8),olive);body.scale.z=.82;body.castShadow=true;turret.add(body);
+ const barrel=new THREE.Mesh(new THREE.CylinderGeometry(.13,.18,2.65,12),steel);barrel.rotation.z=Math.PI/2;barrel.position.set(1.45,.06,0);turret.add(barrel);
+ const mantlet=new THREE.Mesh(new THREE.SphereGeometry(.28,12,10),olive);mantlet.position.set(.55,.05,0);turret.add(mantlet);
+ tank.position.set(x,0,z);tank.rotation.y=Math.PI;world.add(tank);combatVehicles.push({tank,turret,fire:rand(2,4)});
+ colliders.push({x,z,hx:2.55,hz:1.85,top:2.1});
 }
 const mapThemes=[
  {name:'OLD TOWN // URBAN WARZONE',sky:0x89999a,fog:0x89999a,ground:0x777363,wall:0x66716c,accent:0x687d59},
@@ -80,34 +103,44 @@ function buildMap(round){
  if(idx===0||idx===3){
   building(-15,-13,11,12,5.8,wall);building(15,-14,12,11,6.5,wall);building(-15,14,10,11,4.8,wall);building(15,14,11,12,5.7,wall);
   building(0,-24,17,5,4.3,darkConcrete);building(0,24,17,5,4.3,darkConcrete);
-  for(let i=0;i<7;i++){box(-7+i*2.3,.7,-5,1.5,1.4,1.5,accent);box(6+i*2.2,.6,6,1.4,1.2,1.4,wall);}
+  for(let i=0;i<7;i++){addCrate(-7+i*2.3,-5,1.35);addCrate(6+i*2.2,6,1.25);}
+  addTank(-8,17);
  }else if(idx===1){
   // Desert outpost: perimeter walls, watchtowers, sand berms and fuel stores.
   for(let side of [-1,1]){box(side*19,1.2,0,1.1,2.4,38,wall);box(side*11,.65,-15,8,1.3,1.2,accent);box(side*11,.65,15,8,1.3,1.2,accent);}
   for(let x of [-18,18])for(let z of [-18,18]){box(x,3,z,2.8,6,2.8,wall);box(x,6.2,z,4,.4,4,trim);}
   building(0,-18,13,7,4.2,wall);building(-8,9,8,7,3.4,accent);building(9,10,7,8,3.8,wall);
+   for(let i=0;i<8;i++)addCrate(-17+(i%4)*2.2,2+Math.floor(i/4)*2,1.3);addTank(12,-2);
   for(let i=0;i<9;i++){const rock=new THREE.Mesh(new THREE.DodecahedronGeometry(rand(.8,2.3),1),debris);rock.position.set(rand(-25,25),rand(.3,1),rand(-25,25));rock.scale.y=.55;world.add(rock);}
  }else{
   // Industrial yard: hangar, tanks, loading bays and pipe racks.
   building(0,-20,23,9,7.5,wall);building(-17,4,9,17,5.5,darkConcrete);building(17,5,10,17,5.8,wall);
   for(let x of [-11,-5,5,11]){const tank=new THREE.Mesh(new THREE.CylinderGeometry(2,2,6,20),steel);tank.position.set(x,3,13);tank.castShadow=true;world.add(tank);const cap=new THREE.Mesh(new THREE.CylinderGeometry(2,2,.25,20),accent);cap.position.set(x,6.1,13);world.add(cap);}
-  for(let i=0;i<8;i++){box(-20+i*5,1.1,-4,3.8,2.2,2.4,i%2?accent:steel);}
+  for(let i=0;i<8;i++){addCrate(-20+i*5,-4,1.45);}
+   addTank(10,17);
  }
  for(let i=0;i<95;i++){const x=rand(-27,27),z=rand(-27,27);if(Math.abs(x)<4&&z>0&&z<12)continue;const r=rand(.12,.55);const rock=new THREE.Mesh(new THREE.DodecahedronGeometry(r,0),debris);rock.position.set(x,-.02+r*.25,z);rock.rotation.set(rand(0,3),rand(0,3),rand(0,3));world.add(rock);}
  for(let i=0;i<6;i++){const barrel=new THREE.Mesh(new THREE.CylinderGeometry(.38,.42,1.05,16),mat(idx===1?0x75603f:0x59483b));barrel.position.set(rand(-22,22),.52,rand(-22,22));barrel.castShadow=true;world.add(barrel);}
+  // Extra waist-high wooden cover positions, spread through each combat lane.
+  for(const [x,z] of [[-22,-8],[22,-7],[-19,10],[19,11],[-5,18],[5,-13]])addCrate(x,z,1.5);
  for(let i=0;i<10;i++){const x=-22+i*4.9;box(x,1.15,-1,.2,2.3,.2,steel);box(x,2.35,-1,.5,.12,.5,trim,false);}
 }
 buildMap(1);
 const skyHaze = new THREE.Mesh(new THREE.PlaneGeometry(100,18),new THREE.MeshBasicMaterial({color:0xc1c5b3,transparent:true,opacity:.18,side:THREE.DoubleSide}));skyHaze.position.set(0,11,-38);world.add(skyHaze);
 // Distant patrol aircraft: a small, low-cost silhouette that crosses the skyline.
-const patrolAircraft=new THREE.Group();
-const aircraftBody=mat(0x39413d,.72,.18),aircraftGlass=mat(0x182b32,.25,.45);
-const fuselage=new THREE.Mesh(new THREE.CylinderGeometry(.12,.18,2.9,10),aircraftBody);fuselage.rotation.z=Math.PI/2;patrolAircraft.add(fuselage);
-const wings=new THREE.Mesh(new THREE.BoxGeometry(.18,.055,2.25),aircraftBody);patrolAircraft.add(wings);
-const tailWing=new THREE.Mesh(new THREE.BoxGeometry(.14,.045,.85),aircraftBody);tailWing.position.x=-1.12;patrolAircraft.add(tailWing);
-const tailFin=new THREE.Mesh(new THREE.BoxGeometry(.32,.36,.06),aircraftBody);tailFin.position.set(-1.18,.16,0);patrolAircraft.add(tailFin);
-const cockpit=new THREE.Mesh(new THREE.SphereGeometry(.14,10,8),aircraftGlass);cockpit.scale.set(1.5,.7,.9);cockpit.position.x=.62;patrolAircraft.add(cockpit);
-patrolAircraft.scale.set(1.15,1.15,1.15);patrolAircraft.position.set(-48,19,-34);scene.add(patrolAircraft);
+// Combat helicopter with recognizable cockpit, tail boom, tail rotor, landing skids and spinning main rotor.
+const patrolAircraft=new THREE.Group(),heliBody=mat(0x46513c,.72,.25),heliDark=mat(0x202b2d,.38,.55),heliGlass=mat(0x172d38,.18,.65);
+const cabin=new THREE.Mesh(new THREE.SphereGeometry(1,18,14),heliBody);cabin.scale.set(1.55,.72,.82);patrolAircraft.add(cabin);
+const nose=new THREE.Mesh(new THREE.SphereGeometry(.7,16,12),heliBody);nose.scale.set(1.05,.62,.8);nose.position.set(1.12,-.08,0);patrolAircraft.add(nose);
+const windshield=new THREE.Mesh(new THREE.SphereGeometry(.57,14,10),heliGlass);windshield.scale.set(.28,.55,.72);windshield.position.set(1.68,.12,0);patrolAircraft.add(windshield);
+const tailBoom=new THREE.Mesh(new THREE.CylinderGeometry(.16,.28,3.7,12),heliBody);tailBoom.rotation.z=-Math.PI/2;tailBoom.position.set(-2.35,.2,0);patrolAircraft.add(tailBoom);
+const tailFin=new THREE.Mesh(new THREE.BoxGeometry(.75,.9,.12),heliBody);tailFin.position.set(-4.05,.35,0);patrolAircraft.add(tailFin);
+const tailRotor=new THREE.Group();tailRotor.position.set(-4.1,.35,.18);for(let i=0;i<4;i++){const blade=new THREE.Mesh(new THREE.BoxGeometry(.08,.92,.07),heliDark);blade.rotation.z=i*Math.PI/2;tailRotor.add(blade);}patrolAircraft.add(tailRotor);
+const mast=new THREE.Mesh(new THREE.CylinderGeometry(.12,.12,.55,10),heliDark);mast.position.y=.85;patrolAircraft.add(mast);
+const mainRotor=new THREE.Group();mainRotor.position.y=1.12;for(let i=0;i<4;i++){const blade=new THREE.Mesh(new THREE.BoxGeometry(5.8,.055,.16),heliDark);blade.rotation.y=i*Math.PI/2;mainRotor.add(blade);}patrolAircraft.add(mainRotor);
+for(const side of [-1,1]){const skid=new THREE.Mesh(new THREE.CylinderGeometry(.055,.055,3.5,8),heliDark);skid.rotation.z=Math.PI/2;skid.position.set(0,-.95,side*.72);patrolAircraft.add(skid);const strut=new THREE.Mesh(new THREE.CylinderGeometry(.045,.045,.85,8),heliDark);strut.position.set(.45,-.55,side*.72);patrolAircraft.add(strut);}
+patrolAircraft.scale.set(1.45,1.45,1.45);patrolAircraft.position.set(-48,15,-34);scene.add(patrolAircraft);
+let heliAttack=rand(2.5,4.5);const heliBullets=[];
 
 const weapon = new THREE.Group(); camera.add(weapon); scene.add(camera);
 const gunMat=mat(0x20292b,.34,.72), gunPolymer=mat(0x252d2b,.78,.05), gunAccent=mat(0x65734f,.52,.18);
@@ -452,7 +485,11 @@ function updateBots(dt){
 }
 function updateRadar(){const root=$('radar-dots');root.innerHTML='';for(const b of bots){if(!b.alive)continue;const dx=(b.group.position.x-camera.position.x)/55*130,dz=(b.group.position.z-camera.position.z)/55*130;const dot=document.createElement('i');dot.className='radar-dot';dot.style.left='calc(50% + '+THREE.MathUtils.clamp(dx,-62,62)+'px)';dot.style.top='calc(50% + '+THREE.MathUtils.clamp(dz,-62,62)+'px)';root.append(dot);}}
 function update(dt){
- elapsed+=dt;patrolAircraft.position.x=((elapsed*3.1+48)%110)-55;patrolAircraft.position.y=19+Math.sin(elapsed*.22)*.35;patrolAircraft.position.z=-34+Math.sin(elapsed*.12)*2;shotCooldown=Math.max(0,shotCooldown-dt);recoil=Math.max(0,recoil-dt*.55);
+ elapsed+=dt;patrolAircraft.position.x=((elapsed*2.2+48)%110)-55;patrolAircraft.position.y=15+Math.sin(elapsed*.55)*.65;patrolAircraft.position.z=-27+Math.sin(elapsed*.24)*7;patrolAircraft.rotation.y=Math.PI+Math.sin(elapsed*.24)*.12;mainRotor.rotation.y+=dt*34;tailRotor.rotation.x+=dt*29;
+ heliAttack-=dt;if(heliAttack<=0&&player.active&&player.alive){heliAttack=rand(2.2,3.5);const origin=patrolAircraft.position.clone().add(new THREE.Vector3(1,-.4,0));const target=camera.position.clone().add(new THREE.Vector3(rand(-1.5,1.5),0,rand(-1.5,1.5)));const dir=target.sub(origin).normalize();const bolt=new THREE.Mesh(new THREE.CylinderGeometry(.045,.045,.85,6),new THREE.MeshBasicMaterial({color:0xffb45e,emissive:0xff5522}));bolt.position.copy(origin);bolt.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0),dir);scene.add(bolt);heliBullets.push({mesh:bolt,velocity:dir.multiplyScalar(27),life:2.2});}
+ for(let i=heliBullets.length-1;i>=0;i--){const b=heliBullets[i];b.mesh.position.addScaledVector(b.velocity,dt);b.life-=dt;if(b.mesh.position.distanceTo(camera.position)<.65){damagePlayer(10);b.life=-1;}if(b.life<=0){scene.remove(b.mesh);heliBullets.splice(i,1);}}
+ for(const v of combatVehicles){v.fire-=dt;const target=new THREE.Vector3(camera.position.x-v.tank.position.x,0,camera.position.z-v.tank.position.z);v.turret.rotation.y=Math.atan2(target.x,target.z)-v.tank.rotation.y;if(v.fire<=0&&player.active){v.fire=rand(4,7);const start=v.tank.position.clone().add(new THREE.Vector3(0,2,0));const dir=new THREE.Vector3(camera.position.x-start.x,camera.position.y-start.y,camera.position.z-start.z).normalize();const shell=new THREE.Mesh(new THREE.SphereGeometry(.13,8,6),new THREE.MeshBasicMaterial({color:0xffa34d}));shell.position.copy(start);scene.add(shell);enemyBullets.push({mesh:shell,velocity:dir.multiplyScalar(22),life:1.8,damage:16});}}
+ shotCooldown=Math.max(0,shotCooldown-dt);recoil=Math.max(0,recoil-dt*.55);
  if(player.active&&player.alive){
   roundTime-=dt;if(roundTime<=0){roundTime=0;damagePlayer(12);roundTime=12;}updateTimer();
   const forward=new THREE.Vector3(0,0,-1).applyQuaternion(camera.quaternion);forward.y=0;forward.normalize();const right=new THREE.Vector3().crossVectors(forward,new THREE.Vector3(0,1,0)).normalize();

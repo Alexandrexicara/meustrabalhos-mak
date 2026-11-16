@@ -185,7 +185,7 @@ const muzzleLight=new THREE.PointLight(0xffb34e,0,8,1.7);muzzleLight.position.se
 weapon.position.set(0,0,0);
 
 const player={health:100,ammo:30,reserve:120,grenades:3,kills:0,shots:0,hits:0,round:1,reloading:false,alive:true,active:true,velocity:new THREE.Vector3(),onGround:true};
-const bots=[]; const bullets=[]; const enemyBullets=[]; const grenades=[]; const explosions=[]; const clock=new THREE.Clock();
+const bots=[]; const bullets=[]; const enemyBullets=[]; const grenades=[]; const explosions=[]; const bloodParticles=[]; const clock=new THREE.Clock();
 let missionMarker=null,missionKind='eliminate',missionProgress=0,missionDuration=0,missionX=0,missionZ=-8,missionDone=false; const raycaster=new THREE.Raycaster();
 const keys={}; let pointerLocked=false, elapsed=0, roundTime=120, recoil=0, bob=0, shotCooldown=0, toastTimeout;
 const $=id=>document.getElementById(id);
@@ -375,6 +375,27 @@ function fireBot(bot,dt){
  enemyBullets.push({mesh:tracer,velocity:direction.clone().multiplyScalar(36),life:Math.min(1.15,distance/36+.08),damage:rand(4,7)});
  playSound('enemy');
 }
+function spawnBlood(position){
+ for(let i=0;i<9;i++){
+  const mesh=new THREE.Mesh(new THREE.SphereGeometry(rand(.018,.038),6,5),new THREE.MeshBasicMaterial({color:i%3===0?0x8f1010:0xc51b22,transparent:true,opacity:.95,depthWrite:false}));
+  mesh.position.copy(position);scene.add(mesh);
+  bloodParticles.push({mesh,velocity:new THREE.Vector3(rand(-2.8,2.8),rand(.8,3.4),rand(-2.8,2.8)),life:rand(.28,.58),maxLife:.58});
+ }
+}
+function killBot(bot,source='BULLET'){
+ if(!bot.alive)return;
+ bot.alive=false;bot.dying=true;bot.deathAge=0;bot.deathSide=Math.random()<.5?-1:1;
+ bot.deathStartY=bot.group.position.y;bot.hp.visible=false;bot.hpbg.visible=false;
+ bot.fire=999;player.kills++;
+ toast(source==='FRAG'?'HOSTILE ELIMINATED // FRAG':'HOSTILE NEUTRALIZED');
+}
+function damageBot(bot,amount,impact,source='BULLET'){
+ if(!bot||!bot.alive)return;
+ bot.alerted=true;bot.health=Math.max(0,bot.health-amount);bot.hitFlash=.08;
+ bot.hp.scale.x=Math.max(0,bot.health/bot.maxHealth);
+ if(impact)spawnBlood(impact);
+ if(bot.health<=0)killBot(bot,source);
+}
 function shoot(){
  if(!player.active||!pointerLocked||player.reloading||shotCooldown>0)return;
  if(player.ammo<=0){toast('MAGAZINE EMPTY // PRESS R');return;}
@@ -392,7 +413,7 @@ function shoot(){
  scene.add(tracer);setTimeout(()=>{scene.remove(tracer);tracer.geometry.dispose();tracer.material.dispose();},75);
  const targets=[];for(const b of bots)if(b.alive)b.group.traverse(o=>{if(o.isMesh&&!o.userData.noHit&&o.geometry.type!=='PlaneGeometry')targets.push(o);});
  const hit=raycaster.intersectObjects(targets,false)[0];
- if(hit){playSound('hit');const bot=bots.find(b=>{if(!b.alive)return false;let node=hit.object;while(node){if(node===b.group)return true;node=node.parent;}return false;});if(bot){bot.alerted=true;bot.fire=Math.min(bot.fire,.35);player.hits++;bot.health-=34;bot.hitFlash=.08;bot.hp.scale.x=Math.max(0,bot.health/bot.maxHealth);$('hit-marker').classList.add('show');setTimeout(()=>$('hit-marker').classList.remove('show'),100);if(bot.health<=0){bot.alive=false;scene.remove(bot.group);player.kills++;toast('HOSTILE NEUTRALIZED');}}}
+ if(hit){playSound('hit');const bot=bots.find(b=>{if(!b.alive)return false;let node=hit.object;while(node){if(node===b.group)return true;node=node.parent;}return false;});if(bot){bot.fire=Math.min(bot.fire,.35);player.hits++;damageBot(bot,34,hit.point,'BULLET');$('hit-marker').classList.add('show');setTimeout(()=>$('hit-marker').classList.remove('show'),100);}}
  updateHUD();
 }
 function throwGrenade(){
@@ -408,7 +429,7 @@ function detonateGrenade(g){
  const center=g.mesh.position.clone();scene.remove(g.mesh);playSound('explosion');
  const flash=new THREE.Mesh(new THREE.SphereGeometry(.5,16,12),new THREE.MeshBasicMaterial({color:0xffa34d,transparent:true,opacity:.82,depthWrite:false}));
  flash.position.copy(center);scene.add(flash);explosions.push({mesh:flash,age:0});
- for(const bot of bots){if(!bot.alive)continue;const d=bot.group.position.distanceTo(center);if(d<8){const damage=Math.round(115*(1-d/8));bot.health-=damage;bot.hp.scale.x=Math.max(0,bot.health/bot.maxHealth);if(bot.health<=0){bot.alive=false;scene.remove(bot.group);player.kills++;toast('HOSTILE ELIMINATED // FRAG');}}}
+ for(const bot of bots){if(!bot.alive)continue;const target=bot.group.position.clone().add(new THREE.Vector3(0,.85,0));const d=target.distanceTo(center);if(d<9){const damage=Math.max(0,Math.round(190*Math.pow(1-d/9,1.35)));if(damage>0)damageBot(bot,damage,target,'FRAG');}}
  if(camera.position.distanceTo(center)<5.5)damagePlayer(Math.round(30*(1-camera.position.distanceTo(center)/7)));
  updateHUD();
 }
@@ -424,6 +445,7 @@ function updateProjectiles(dt){
   if(b.life<=0){scene.remove(b.mesh);enemyBullets.splice(i,1);}
  }
  for(let i=explosions.length-1;i>=0;i--){const e=explosions[i];e.age+=dt;e.mesh.scale.setScalar(1+e.age*10);e.mesh.material.opacity=Math.max(0,.82-e.age*1.25);if(e.age>.66){scene.remove(e.mesh);e.mesh.geometry.dispose();e.mesh.material.dispose();explosions.splice(i,1);}}
+ for(let i=bloodParticles.length-1;i>=0;i--){const p=bloodParticles[i];p.life-=dt;p.velocity.y-=7.5*dt;p.mesh.position.addScaledVector(p.velocity,dt);p.mesh.material.opacity=Math.max(0,p.life/p.maxLife);if(p.mesh.position.y<.025){p.mesh.position.y=.025;p.velocity.set(0,0,0);p.life=Math.min(p.life,.12);}if(p.life<=0){scene.remove(p.mesh);p.mesh.geometry.dispose();p.mesh.material.dispose();bloodParticles.splice(i,1);}}
 }
 function reload(){if(!player.active||player.reloading||player.ammo===30||player.reserve<=0)return;player.reloading=true;playSound('reload');toast('RELOADING');setTimeout(()=>{const amount=Math.min(30-player.ammo,player.reserve);player.ammo+=amount;player.reserve-=amount;player.reloading=false;updateHUD();},1250);}
 function togglePause(){if(!player.active||!player.alive)return;if(pointerLocked){document.exitPointerLock();}else{canvas.requestPointerLock?.();}}
@@ -456,7 +478,9 @@ function chooseCover(bot){
 }
 function updateBots(dt){
  for(let i=0;i<bots.length;i++){
-  const b=bots[i];if(!b.alive)continue;
+  const b=bots[i];
+  if(b.dying){b.deathAge+=dt;const t=Math.min(1,b.deathAge/.48);b.group.rotation.z=b.deathSide*1.48*t;b.group.position.y=b.deathStartY-.78*t;if(t>=1){b.dying=false;b.corpse=true;}continue;}
+  if(!b.alive)continue;
   if(b.mixer)b.mixer.update(dt);
   const p=b.group.position;
   const dx=camera.position.x-p.x,dz=camera.position.z-p.z,dist=Math.hypot(dx,dz)||1;

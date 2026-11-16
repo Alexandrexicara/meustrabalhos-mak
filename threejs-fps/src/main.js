@@ -249,9 +249,13 @@ function attachSoldier(bot){
  heldRifle.traverse(o=>{if(o.isMesh){o.castShadow=true;o.receiveShadow=true;}});
  bot.heldRifle=heldRifle;
  bot.mixer=new THREE.AnimationMixer(model);
- const idle=soldierClips.find(c=>/idle/i.test(c.name))||soldierClips[0];
- const walk=soldierClips.find(c=>/walk/i.test(c.name))||idle;
- const run=soldierClips.find(c=>/run/i.test(c.name))||walk;
+ const idleSource=soldierClips.find(c=>/idle/i.test(c.name))||soldierClips[0];
+ const walkSource=soldierClips.find(c=>/walk/i.test(c.name))||idleSource;
+ const runSource=soldierClips.find(c=>/run/i.test(c.name))||walkSource;
+ // Keep locomotion in the legs, but strip arm/hand tracks: the rifle stays shouldered
+ // instead of the run cycle dropping the soldier's weapon to a relaxed carry.
+ const combatClip=(source,label)=>source?new THREE.AnimationClip(label,source.duration,source.tracks.filter(t=>!/arm|shoulder|clavicle|hand|finger|weapon|rifle/i.test(t.name))):null;
+ const idle=combatClip(idleSource,'combat-idle'),walk=combatClip(walkSource,'combat-walk'),run=combatClip(runSource,'combat-run');
  bot.actions={idle:idle?bot.mixer.clipAction(idle):null,walk:walk?bot.mixer.clipAction(walk):null,run:run?bot.mixer.clipAction(run):null};
  bot.currentAction=null;setBotAnimation(bot,'idle');
 }
@@ -294,7 +298,7 @@ function makeBot(index){
  }
  if(!spawn)spawn=bestCandidate||{x:THREE.MathUtils.clamp((index%4-1.5)*5,-20,20),z:THREE.MathUtils.clamp(-12-Math.floor(index/4)*4,-22,22)};
  group.position.set(spawn.x,0,spawn.z);
- scene.add(group);const bot={group,hp,hpbg,health:100,maxHealth:100,fire:rand(1.1,3.2),speed:rand(2.0,2.8),strafe:index%2?1:-1,alive:true,hitFlash:0,mixer:null};bots.push(bot);
+ scene.add(group);const bot={group,hp,hpbg,health:100,maxHealth:100,fire:rand(.35,1.0),speed:rand(2.35,3.05),strafe:index%2?1:-1,alive:true,hitFlash:0,mixer:null};bots.push(bot);
  if(soldierTemplate)attachSoldier(bot);return bot;
 }
 function spawnWave(){
@@ -350,14 +354,14 @@ function updateHUD(){
 function moveBlocked(x,z){if(Math.abs(x)>mapBounds||Math.abs(z)>mapBounds)return true;return colliders.some(c=>Math.abs(x-c.x)<c.hx+.42&&Math.abs(z-c.z)<c.hz+.42);}
 function damagePlayer(amount){if(!player.alive)return;playSound('damage');player.health=Math.max(0,player.health-amount);$('damage-flash').classList.add('show');setTimeout(()=>$('damage-flash').classList.remove('show'),100);updateHUD();if(player.health<=0){player.alive=false;player.active=false;document.exitPointerLock?.();$('gameover-copy').textContent='You neutralized '+player.kills+' hostiles across '+player.round+' rounds.';gameoverScreen.classList.remove('hidden');}}
 function fireBot(bot,dt){
- bot.fire-=dt;if(bot.fire>0)return;bot.fire=rand(.78,1.45);
+ bot.fire-=dt;if(bot.fire>0)return;bot.fire=rand(.48,.82);
  if(bot.heldRifle){const flash=new THREE.Mesh(new THREE.SphereGeometry(.075,8,6),new THREE.MeshBasicMaterial({color:0xffc16a,transparent:true,opacity:.95,blending:THREE.AdditiveBlending,depthWrite:false}));flash.position.set(.23,1.03,.98);bot.group.add(flash);setTimeout(()=>{bot.group.remove(flash);flash.geometry.dispose();flash.material.dispose();},65);}
- const origin=bot.group.position.clone().add(new THREE.Vector3(0,1.28,0));
- const target=camera.position.clone().add(new THREE.Vector3(rand(-.65,.65),rand(-.45,.45),rand(-.65,.65)));
+ const origin=bot.group.position.clone().add(new THREE.Vector3(0,1.34,0));
+ const target=camera.position.clone().add(new THREE.Vector3(rand(-.38,.38),rand(-.28,.28),rand(-.38,.38)));
  const direction=target.sub(origin).normalize();const distance=origin.distanceTo(camera.position);
  const tracer=new THREE.Mesh(new THREE.CylinderGeometry(.018,.018,.72,6),new THREE.MeshBasicMaterial({color:0xffb36b}));
  tracer.position.copy(origin).addScaledVector(direction,.5);tracer.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0),direction);scene.add(tracer);
- enemyBullets.push({mesh:tracer,velocity:direction.clone().multiplyScalar(34),life:Math.min(1.1,distance/34+.12),damage:rand(5,9)});
+ enemyBullets.push({mesh:tracer,velocity:direction.clone().multiplyScalar(42),life:Math.min(1.0,distance/42+.1),damage:rand(6,10)});
  playSound('enemy');
 }
 function shoot(){

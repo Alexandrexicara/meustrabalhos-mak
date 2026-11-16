@@ -289,7 +289,7 @@ function shoot(){
 }
 function throwGrenade(){
  if(!player.active||!pointerLocked||player.grenades<=0)return;
- player.grenades--;updateHUD();toast('FRAG OUT // '+player.grenades+' LEFT);
+ player.grenades--;updateHUD();toast('FRAG OUT // '+player.grenades+' LEFT');
  const grenade=new THREE.Mesh(new THREE.SphereGeometry(.105,12,10),mat(0x45513b,.72,.18));
  grenade.position.copy(camera.position).add(new THREE.Vector3(0,-.18,0));
  const direction=new THREE.Vector3(0,0,-1).applyQuaternion(camera.quaternion);

@@ -1,0 +1,25 @@
+name: Build Three.js FPS
+on:
+  push:
+    paths:
+      - "threejs-fps/**"
+      - ".github/workflows/build-fps.yml"
+  pull_request:
+    paths:
+      - "threejs-fps/**"
+      - ".github/workflows/build-fps.yml"
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: threejs-fps
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: threejs-fps/package-lock.json
+      - run: npm install
+      - run: npm run build

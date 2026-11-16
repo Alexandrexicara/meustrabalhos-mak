@@ -521,7 +521,7 @@ function throwGrenade(){
  grenade.castShadow=true;scene.add(grenade);grenades.push({mesh:grenade,velocity,fuse:2.15,bounced:false});
 }
 function detonateGrenade(g){
- const center=g.mesh.position.clone();scene.remove(g.mesh);playSound('explosion');damageCratesInBlast(center,7,145);
+ const center=g.mesh.position.clone();scene.remove(g.mesh);playSound('explosion');damageCratesInBlast(center,7,190);
  const flash=new THREE.Mesh(new THREE.SphereGeometry(.5,16,12),new THREE.MeshBasicMaterial({color:0xffa34d,transparent:true,opacity:.82,depthWrite:false}));
  flash.position.copy(center);scene.add(flash);explosions.push({mesh:flash,age:0});
  for(const bot of bots){if(!bot.alive)continue;const target=bot.group.position.clone().add(new THREE.Vector3(0,.85,0));const d=target.distanceTo(center);if(d<9){const damage=Math.max(0,Math.round(190*Math.pow(1-d/9,1.35)));if(damage>0)damageBot(bot,damage,target,'FRAG');}}

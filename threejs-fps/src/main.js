@@ -266,6 +266,12 @@ function attachSoldier(bot){
  const magazine=new THREE.Mesh(new THREE.BoxGeometry(.09,.24,.13),rifleMetal);magazine.position.set(0,-.17,.1);heldRifle.add(magazine);
  heldRifle.traverse(o=>{if(o.isMesh){o.castShadow=true;o.receiveShadow=true;}});
  bot.heldRifle=heldRifle;
+ // Overlay both forearms in a true two-hand firing grip, aligned with the stock and handguard.
+ const arms=new THREE.Group();arms.name='rifle-grip-arms';model.add(arms);const sleeve=mat(0x59634b),glove=mat(0x292d2a);
+ const armBetween=(a,b,r=.075)=>{const v=new THREE.Vector3(...b).sub(new THREE.Vector3(...a));const mesh=new THREE.Mesh(new THREE.CapsuleGeometry(r,Math.max(.08,v.length()-.12),5,8),sleeve);mesh.position.set((a[0]+b[0])/2,(a[1]+b[1])/2,(a[2]+b[2])/2);mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0),v.normalize());mesh.castShadow=true;arms.add(mesh);};
+ armBetween([-.29,1.43,0],[-.12,1.34,-.57]);armBetween([.29,1.43,0],[.13,1.34,-.39]);
+ for(const p of [[-.12,1.34,-.57],[.13,1.34,-.39]]){const hand=new THREE.Mesh(new THREE.SphereGeometry(.085,10,8),glove);hand.position.set(...p);hand.castShadow=true;arms.add(hand);}
+ bot.rifleGripArms=arms;
  bot.mixer=new THREE.AnimationMixer(model);
  const idle=soldierClips.find(c=>/idle/i.test(c.name))||soldierClips[0];
  const walk=soldierClips.find(c=>/walk/i.test(c.name))||idle;
@@ -409,7 +415,7 @@ function damageBot(bot,amount,impact,source='BULLET'){
 }
 function shoot(){
  if(!player.active||!pointerLocked||player.reloading||shotCooldown>0)return;
- const type=player.weaponType;if(type==='rifle'&&player.ammo<=0&&player.reserve<=0){setWeapon('pistol');toast('FUZIL SEM MUNIÇÃO // PISTOLA SACADA');return;}if(type==='pistol'&&player.pistolAmmo<=0){toast('PISTOLA VAZIA // PROCURE MUNIÇÃO');return;}if(type==='launcher'&&player.rocketAmmo<=0){setWeapon('rifle');toast('LANÇA-FOGUETES DESCARTADO // FUZIL RESTAURADO');return;}if(type==='rifle')player.ammo--;else if(type==='pistol')player.pistolAmmo--;else{player.rocketAmmo=0;setWeapon('rifle');toast('FOGUETE DISPARADO // LANÇADOR DESCARTADO');}player.shots++;playSound(type==='launcher'?'explosion':'shot');shotCooldown=type==='pistol'?.32:type==='launcher'?1.1:.2;recoil=Math.min(recoil+(type==='launcher'?.18:.09),.3);
+ const type=player.weaponType;if(type==='rifle'&&player.ammo<=0&&player.reserve<=0){setWeapon('pistol');toast('FUZIL SEM MUNIÇÃO // PISTOLA SACADA');return;}if(type==='pistol'&&player.pistolAmmo<=0){toast('PISTOLA VAZIA // PROCURE MUNIÇÃO');return;}if(type==='launcher'&&player.rocketAmmo<=0){setWeapon('rifle');toast('LANÇA-FOGUETES DESCARTADO // FUZIL RESTAURADO');return;}if(type==='rifle')player.ammo--;else if(type==='pistol')player.pistolAmmo--;else{player.rocketAmmo=0;toast('FOGUETE DISPARADO // LANÇADOR DESCARTÁVEL');}player.shots++;playSound(type==='launcher'?'explosion':'shot');shotCooldown=type==='pistol'?.32:type==='launcher'?1.1:.2;recoil=Math.min(recoil+(type==='launcher'?.18:.09),.3);
  muzzleFlash.visible=true;muzzleLight.intensity=17;
  muzzleFlash.scale.set(rand(.86,1.18),rand(.86,1.18),rand(.9,1.3));
  setTimeout(()=>{muzzleFlash.visible=false;muzzleLight.intensity=0;},72);
@@ -424,6 +430,7 @@ function shoot(){
  const targets=[];for(const b of bots)if(b.alive)b.group.traverse(o=>{if(o.isMesh&&!o.userData.noHit&&o.geometry.type!=='PlaneGeometry')targets.push(o);});
  const hit=raycaster.intersectObjects(targets,false)[0];
  if(hit){playSound('hit');const bot=bots.find(b=>{if(!b.alive)return false;let node=hit.object;while(node){if(node===b.group)return true;node=node.parent;}return false;});if(bot){bot.fire=Math.min(bot.fire,.35);player.hits++;const damage=type==='pistol'?24:type==='launcher'?150:34;damageBot(bot,damage,hit.point,type==='launcher'?'ROCKET':'BULLET');if(type==='launcher'){const blast=new THREE.Mesh(new THREE.SphereGeometry(1,14,10),new THREE.MeshBasicMaterial({color:0xff9a42,transparent:true,opacity:.65,depthWrite:false}));blast.position.copy(hit.point);scene.add(blast);explosions.push({mesh:blast,age:0});for(const other of bots){const d=other.group.position.distanceTo(hit.point);if(other!==bot&&other.alive&&d<8)damageBot(other,Math.round(150*(1-d/8)),hit.point,'ROCKET');}}$('hit-marker').classList.add('show');setTimeout(()=>$('hit-marker').classList.remove('show'),100);}}
+ if(type==='launcher')setWeapon('rifle');
  updateHUD();
 }
 function throwGrenade(){

@@ -129,9 +129,16 @@ gunBox(.045,.13,.06,.34,-.075,-1.5,gunAccent);
 const mag=new THREE.Mesh(new THREE.CylinderGeometry(.055,.075,.31,8),gunPolymer);mag.position.set(.34,-.48,-.88);mag.rotation.x=-.12;weapon.add(mag);
 gunBox(.055,.12,.12,.34,-.42,-.58,gunPolymer);
 gunBox(.12,.045,.19,.34,-.18,-.62,gunAccent);
-const muzzleFlash=new THREE.Mesh(new THREE.SphereGeometry(.13,10,8),new THREE.MeshBasicMaterial({color:0xffe2a0,transparent:true,opacity:1,blending:THREE.AdditiveBlending,depthWrite:false}));muzzleFlash.position.set(.34,-.22,-1.72);muzzleFlash.visible=false;weapon.add(muzzleFlash);
-const muzzleFlare=new THREE.Mesh(new THREE.ConeGeometry(.085,.42,10),new THREE.MeshBasicMaterial({color:0xff9a3c,transparent:true,opacity:.9,blending:THREE.AdditiveBlending,depthWrite:false}));muzzleFlare.rotation.x=-Math.PI/2;muzzleFlare.position.set(.34,-.22,-1.91);muzzleFlare.visible=false;weapon.add(muzzleFlare);
-const muzzleLight=new THREE.PointLight(0xffa34d,0,5,2);muzzleLight.position.set(.34,-.22,-1.72);weapon.add(muzzleLight);
+// Layered, directional muzzle flash: hot core, branching flame tongues and a short-lived light.
+const muzzleFlash=new THREE.Group();muzzleFlash.position.set(.34,-.22,-1.69);muzzleFlash.visible=false;weapon.add(muzzleFlash);
+const flashCore=new THREE.Mesh(new THREE.SphereGeometry(.105,12,10),new THREE.MeshBasicMaterial({color:0xfff2c2,transparent:true,opacity:1,blending:THREE.AdditiveBlending,depthWrite:false}));flashCore.scale.set(.8,.8,1.8);muzzleFlash.add(flashCore);
+const flameMat=new THREE.MeshBasicMaterial({color:0xffa12b,transparent:true,opacity:.95,blending:THREE.AdditiveBlending,depthWrite:false,side:THREE.DoubleSide});
+const hotMat=new THREE.MeshBasicMaterial({color:0xffe5a0,transparent:true,opacity:.9,blending:THREE.AdditiveBlending,depthWrite:false,side:THREE.DoubleSide});
+for(let i=0;i<7;i++){
+ const flame=new THREE.Mesh(new THREE.ConeGeometry(i===0?.095:.045,i===0?.48:rand(.24,.42),8),i%2?flameMat:hotMat);
+ flame.rotation.x=-Math.PI/2;flame.rotation.z=(i-3)*.34;flame.position.z=-.12-rand(0,.12);muzzleFlash.add(flame);
+}
+const muzzleLight=new THREE.PointLight(0xffb34e,0,8,1.7);muzzleLight.position.set(.34,-.22,-1.7);weapon.add(muzzleLight);
 weapon.position.set(0,0,0);
 
 const player={health:100,ammo:30,reserve:120,grenades:3,kills:0,shots:0,hits:0,round:1,reloading:false,alive:true,active:true,velocity:new THREE.Vector3(),onGround:true};
@@ -237,8 +244,19 @@ function makeBot(index){
  for(const arm of fallback.children.filter(o=>o.geometry?.type==='CapsuleGeometry'&&o.position.y>1)){arm.position.y=1.22;arm.position.z=.16;arm.rotation.x=.82;}
  const hpbg=new THREE.Mesh(new THREE.PlaneGeometry(.72,.07),new THREE.MeshBasicMaterial({color:0x17211e,side:THREE.DoubleSide}));hpbg.position.y=2.12;hpbg.userData.noHit=true;group.add(hpbg);
  const hp=new THREE.Mesh(new THREE.PlaneGeometry(.68,.045),new THREE.MeshBasicMaterial({color:0xff755e,side:THREE.DoubleSide}));hp.position.set(0,2.12,.006);hp.userData.noHit=true;group.add(hp);
- let spawn={x:0,z:-16};for(let attempt=0;attempt<40;attempt++){const candidate={x:rand(-12,12),z:rand(-21,-13)};if(!moveBlocked(candidate.x,candidate.z)&&!bots.some(other=>other.alive&&Math.hypot(other.group.position.x-candidate.x,other.group.position.z-candidate.z)<3)){spawn=candidate;break;}}group.position.set(spawn.x,0,spawn.z);
- scene.add(group);const bot={group,hp,hpbg,health:100,maxHealth:100,fire:rand(2.2,4.5),speed:rand(1.2,2),strafe:rand(-1,1),alive:true,hitFlash:0,mixer:null};bots.push(bot);
+ // Spawn around the whole combat perimeter, not in one narrow front cluster.
+ let spawn=null,bestCandidate=null,bestGap=-1;
+ for(let attempt=0;attempt<900;attempt++){
+  const angle=Math.random()*Math.PI*2,radius=rand(14,23);
+  const candidate={x:THREE.MathUtils.clamp(camera.position.x+Math.cos(angle)*radius,-23,23),z:THREE.MathUtils.clamp(camera.position.z+Math.sin(angle)*radius,-23,23)};
+  if(moveBlocked(candidate.x,candidate.z))continue;
+  const gap=bots.filter(other=>other.alive).reduce((m,other)=>Math.min(m,Math.hypot(other.group.position.x-candidate.x,other.group.position.z-candidate.z)),99);
+  if(gap>bestGap){bestGap=gap;bestCandidate=candidate;}
+  if(gap>=4.4){spawn=candidate;break;}
+ }
+ if(!spawn)spawn=bestCandidate||{x:THREE.MathUtils.clamp((index%4-1.5)*5,-20,20),z:THREE.MathUtils.clamp(-12-Math.floor(index/4)*4,-22,22)};
+ group.position.set(spawn.x,0,spawn.z);
+ scene.add(group);const bot={group,hp,hpbg,health:100,maxHealth:100,fire:rand(1.1,3.2),speed:rand(2.0,2.8),strafe:index%2?1:-1,alive:true,hitFlash:0,mixer:null};bots.push(bot);
  if(soldierTemplate)attachSoldier(bot);return bot;
 }
 function spawnWave(){
@@ -308,9 +326,17 @@ function shoot(){
  if(!player.active||!pointerLocked||player.reloading||shotCooldown>0)return;
  if(player.ammo<=0){toast('MAGAZINE EMPTY // PRESS R');return;}
  player.ammo--;player.shots++;playSound('shot');shotCooldown=.2;recoil=Math.min(recoil+.09,.24);
- muzzleFlash.visible=true;muzzleFlare.visible=true;muzzleLight.intensity=7;
- setTimeout(()=>{muzzleFlash.visible=false;muzzleFlare.visible=false;muzzleLight.intensity=0;},95);
+ muzzleFlash.visible=true;muzzleLight.intensity=17;
+ muzzleFlash.scale.set(rand(.86,1.18),rand(.86,1.18),rand(.9,1.3));
+ setTimeout(()=>{muzzleFlash.visible=false;muzzleLight.intensity=0;},72);
  camera.updateMatrixWorld();raycaster.setFromCamera(new THREE.Vector2(0,0),camera);raycaster.far=65;
+ // A bright, fast tracer visibly leaves the rifle barrel on every shot.
+ const muzzleWorld=new THREE.Vector3();weapon.localToWorld(muzzleWorld.set(.34,-.22,-1.72));
+ const shotDir=new THREE.Vector3(0,0,-1).applyQuaternion(camera.quaternion);
+ const tracerEnd=muzzleWorld.clone().addScaledVector(shotDir,Math.min(42,raycaster.far));
+ const tracerGeo=new THREE.BufferGeometry().setFromPoints([muzzleWorld,tracerEnd]);
+ const tracer=new THREE.Line(tracerGeo,new THREE.LineBasicMaterial({color:0xffdf91,transparent:true,opacity:.95,blending:THREE.AdditiveBlending,depthWrite:false}));
+ scene.add(tracer);setTimeout(()=>{scene.remove(tracer);tracer.geometry.dispose();tracer.material.dispose();},75);
  const targets=[];for(const b of bots)if(b.alive)b.group.traverse(o=>{if(o.isMesh&&!o.userData.noHit&&o.geometry.type!=='PlaneGeometry')targets.push(o);});
  const hit=raycaster.intersectObjects(targets,false)[0];
  if(hit){playSound('hit');const bot=bots.find(b=>{if(!b.alive)return false;let node=hit.object;while(node){if(node===b.group)return true;node=node.parent;}return false;});if(bot){player.hits++;bot.health-=34;bot.hitFlash=.08;bot.hp.scale.x=Math.max(0,bot.health/bot.maxHealth);$('hit-marker').classList.add('show');setTimeout(()=>$('hit-marker').classList.remove('show'),100);if(bot.health<=0){bot.alive=false;scene.remove(bot.group);player.kills++;toast('HOSTILE NEUTRALIZED');}}}
@@ -378,51 +404,44 @@ function updateBots(dt){
   const b=bots[i];if(!b.alive)continue;if(b.mixer)b.mixer.update(dt);
   const p=b.group.position;
   const dx=camera.position.x-p.x,dz=camera.position.z-p.z,dist=Math.hypot(dx,dz)||1;
-  b.group.lookAt(camera.position.x,p.y+1,camera.position.z);
-  b.coverTimer=Math.max(0,(b.coverTimer||0)-dt);
-  b.coverCooldown=Math.max(0,(b.coverCooldown||0)-dt);
-  // Only take short cover pauses when close to an actual obstacle; never camp.
-  const nearCover=colliders.some(c=>Math.abs(p.x-c.x)<c.hx+1.4&&Math.abs(p.z-c.z)<c.hz+1.4);
-  if(dist>9&&nearCover&&b.coverCooldown<=0&&b.coverTimer<=0&&Math.random()<.004){
-   b.coverTimer=rand(.35,.65);b.coverCooldown=rand(6,9);
-  }
+  b.coverTimer=Math.max(0,(b.coverTimer||0)-dt);b.coverCooldown=Math.max(0,(b.coverCooldown||0)-dt);
+  const nearCover=colliders.some(c=>Math.abs(p.x-c.x)<c.hx+1.2&&Math.abs(p.z-c.z)<c.hz+1.2);
+  if(dist>10&&nearCover&&b.coverCooldown<=0&&b.coverTimer<=0&&Math.random()<.0018){b.coverTimer=rand(.25,.45);b.coverCooldown=rand(7,11);}
   b.inCover=b.coverTimer>0;
-  const side=(b.strafe>=0?1:-1);
-  let desiredX=dx/dist,desiredZ=dz/dist;
-  // Keep a loose squad formation, but never let separation override forward pressure.
+  // Squad separation prevents a single pile-up while the whole group presses forward.
   let sepX=0,sepZ=0;
-  for(let j=0;j<bots.length;j++){if(i===j||!bots[j].alive)continue;const ox=p.x-bots[j].group.position.x,oz=p.z-bots[j].group.position.z,od=Math.hypot(ox,oz);if(od>0&&od<2.1){sepX+=ox/od*(2.1-od);sepZ+=oz/od*(2.1-od);}}
-  desiredX+=sepX*.22;desiredZ+=sepZ*.22;
-  if(dist<7){desiredX+=(-dz/dist)*side*.55;desiredZ+=(dx/dist)*side*.55;}
-  const desiredLen=Math.hypot(desiredX,desiredZ)||1;desiredX/=desiredLen;desiredZ/=desiredLen;
-  const speed=b.inCover?b.speed*.25:b.speed*(dist>12?2.15:dist>7?1.55:1.0);
+  for(let j=0;j<bots.length;j++){if(i===j||!bots[j].alive)continue;const ox=p.x-bots[j].group.position.x,oz=p.z-bots[j].group.position.z,od=Math.hypot(ox,oz);if(od>0&&od<3.8){const push=(3.8-od)/3.8;sepX+=ox/od*push;sepZ+=oz/od*push;}}
+  let dirX=dx/dist+sepX*.7,dirZ=dz/dist+sepZ*.7;
+  // Alternate short flanks only at close range; never backpedal away from the player.
+  if(dist<8){const flank=b.strafe*(dist<4?.22:.38);dirX+=(-dz/dist)*flank;dirZ+=(dx/dist)*flank;}
+  const len=Math.hypot(dirX,dirZ)||1;dirX/=len;dirZ/=len;
+  const speed=b.inCover?b.speed*.12:b.speed*(dist>16?1.45:dist>9?1.2:.82);
   const step=speed*dt;
-  // Local steering: sample directions around the desired heading and choose the
-  // walkable step that makes the most progress toward the player.
-  let best=null,bestScore=-Infinity;
-  for(let k=0;k<16;k++){
-   const angle=k*Math.PI/8;
+  let moveX=0,moveZ=0,moved=false;
+  // Search a wide arc around obstacles and select the closest safe forward step.
+  let bestScore=-Infinity;
+  for(let k=0;k<24;k++){
+   const angle=(k-11.5)*Math.PI/24;
    const c=Math.cos(angle),sn=Math.sin(angle);
-   const vx=desiredX*c-desiredZ*sn,vz=desiredX*sn+desiredZ*c;
-   const nx=p.x+vx*step,nz=p.z+vz*step;
-   if(moveBlocked(nx,nz))continue;
+   const vx=dirX*c-dirZ*sn,vz=dirX*sn+dirZ*c;
+   const nx=p.x+vx*step,nz=p.z+vz*step;if(moveBlocked(nx,nz))continue;
    const nextDist=Math.hypot(camera.position.x-nx,camera.position.z-nz);
-   const score=(dist-nextDist)*3+(vx*desiredX+vz*desiredZ)*.7-Math.abs(angle)*.025;
-   if(score>bestScore){bestScore=score;best={x:nx,z:nz};}
+   const score=(dist-nextDist)*4+(vx*dirX+vz*dirZ)*.5-Math.abs(angle)*.018;
+   if(score>bestScore){bestScore=score;moveX=vx;moveZ=vz;moved=true;}
   }
-  if(best&&(!b.inCover||Math.random()>.15)){
-   p.x=best.x;p.z=best.z;
-   setBotAnimation(b,dist>11?'run':'walk');
-  }else if(b.inCover){setBotAnimation(b,'idle');}
-  else{
-   // If a collider traps the direct approach, sidestep around it instead of freezing.
-   const nx=p.x+(-desiredZ)*step*1.8,nz=p.z+desiredX*step*1.8;
-   const bx=p.x+desiredZ*step*1.8,bz=p.z-desiredX*step*1.8;
-   if(!moveBlocked(nx,nz)){p.x=nx;p.z=nz;setBotAnimation(b,'run');}
-   else if(!moveBlocked(bx,bz)){p.x=bx;p.z=bz;setBotAnimation(b,'run');}
-   else setBotAnimation(b,'idle');
+  if(moved&&!b.inCover){p.x+=moveX*step;p.z+=moveZ*step;}
+  else if(!moved){
+   // Try a wider left/right bypass; do not freeze when the direct lane is blocked.
+   for(const sign of [b.strafe,-b.strafe]){
+    const vx=dirX*.25+(-dirZ)*sign*.97,vz=dirZ*.25+dirX*sign*.97;
+    if(!moveBlocked(p.x+vx*step,p.z+vz*step)){moveX=vx;moveZ=vz;p.x+=vx*step;p.z+=vz*step;moved=true;break;}
+   }
   }
-  b.group.scale.y=b.inCover?.9:1;
+  // Face the actual travel vector so the run cycle cannot look like reverse walking.
+  if(moved){b.group.rotation.y=Math.atan2(moveX,moveZ);setBotAnimation(b,dist>10?'run':'walk');}
+  else if(b.inCover){b.group.lookAt(camera.position.x,p.y+1,camera.position.z);setBotAnimation(b,'idle');}
+  else {b.group.lookAt(camera.position.x,p.y+1,camera.position.z);setBotAnimation(b,'idle');}
+  b.group.scale.y=b.inCover?.92:1;
   fireBot(b,dt);
  }
 }

@@ -90,7 +90,7 @@ let currentMap=-1;
 function buildMap(round){
  const idx=(round-1)%mapThemes.length,theme=mapThemes[idx];currentMap=idx;
  world.clear();
- colliders.length=0;
+ colliders.length=0;combatVehicles.length=0;
  scene.background=new THREE.Color(theme.sky);scene.fog=new THREE.Fog(theme.fog,24,88);
  const floorCanvas=document.createElement('canvas');floorCanvas.width=floorCanvas.height=512;
  const ctx=floorCanvas.getContext('2d');ctx.fillStyle='#'+theme.ground.toString(16).padStart(6,'0');ctx.fillRect(0,0,512,512);

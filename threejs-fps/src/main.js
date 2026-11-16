@@ -198,10 +198,15 @@ function attachSoldier(bot){
  if(!soldierTemplate||!bot.alive)return;
  const old=bot.group.getObjectByName('fallback-body');if(old)bot.group.remove(old);
  const model=cloneSkeleton(soldierTemplate);model.name='rigged-soldier';model.scale.setScalar(1.0);model.position.y=0;
+ // Soldier.glb's authored forward axis is -Z; turn the character so its chest,
+ // face and locomotion point along the squad group's +Z travel direction.
+ model.rotation.y=Math.PI;
  model.traverse(o=>{if(o.isMesh){o.castShadow=true;o.receiveShadow=true;if(o.material)o.material=o.material.clone();}});
  bot.group.add(model);bot.model=model;
  // Attach a visible rifle to the soldier's hands; barrel points along the soldier's forward axis (+Z).
- const heldRifle=new THREE.Group();heldRifle.name='held-rifle';heldRifle.position.set(.23,1.03,.2);model.add(heldRifle);
+ const heldRifle=new THREE.Group();heldRifle.name='held-rifle';
+ // Counter-rotate the attached rifle so its muzzle still points forward after the soldier correction.
+ heldRifle.position.set(-.23,1.03,-.2);heldRifle.rotation.y=Math.PI;model.add(heldRifle);
  const rifleMetal=mat(0x20282a,.36,.7),riflePoly=mat(0x343b35,.8,.05);
  const receiver=new THREE.Mesh(new THREE.BoxGeometry(.13,.14,.43),rifleMetal);heldRifle.add(receiver);
  const handguard=new THREE.Mesh(new THREE.BoxGeometry(.105,.105,.32),riflePoly);handguard.position.z=.31;heldRifle.add(handguard);

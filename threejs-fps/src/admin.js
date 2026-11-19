@@ -134,11 +134,11 @@ async function loadPlayers() {
     $('admin-refresh').disabled = false;
   }
 }
-async function login(password) {
+async function login(email, password) {
   const response = await fetch(API + '/api/admin/login', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ password })
+    body: JSON.stringify({ email, password })
   });
   const data = await response.json().catch(() => ({}));
   if (!response.ok) throw new Error(data.error || 'Falha ao entrar.');
@@ -154,7 +154,7 @@ $('admin-login-form').addEventListener('submit', async event => {
   if (button) button.disabled = true;
   message('admin-login-message', 'Verificando acesso...');
   try {
-    await login($('admin-password').value);
+    await login($('admin-email').value, $('admin-password').value);
     $('admin-password').value = '';
   } catch (error) {
     message('admin-login-message', error.message, true);

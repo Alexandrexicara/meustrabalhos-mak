@@ -41,6 +41,21 @@
     .admin-status.wait{background:#473b22;color:#ffd58a}
     .admin-status.no{background:#482725;color:#ffaaa2}
     .admin-empty{text-align:center;color:#91a0a7;padding:30px}
+
+    .admin-phase-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;margin:18px 0 24px}
+    .admin-phase-card{display:flex;min-height:130px;flex-direction:column;justify-content:flex-end;gap:6px;padding:16px;text-decoration:none;color:#eef4ef;border:1px solid #46564b;background:linear-gradient(145deg,#24352c,#10191c);position:relative;overflow:hidden;transition:transform .16s,border-color .16s}
+    .admin-phase-card:hover{transform:translateY(-3px);border-color:#c5f36b}
+    .admin-phase-card:before{content:'';position:absolute;inset:0;background:radial-gradient(ellipse at 85% 15%,rgba(197,243,107,.18),transparent 55%);pointer-events:none}
+    .admin-phase-card b,.admin-phase-card strong,.admin-phase-card small{position:relative;z-index:1}
+    .admin-phase-card b{font-size:10px;letter-spacing:2px;color:#c5f36b}
+    .admin-phase-card strong{font:800 22px 'Barlow Condensed';letter-spacing:1px}
+    .admin-phase-card small{font-size:10px;color:#aab7be;line-height:1.5}
+    .admin-phase-card:nth-child(2){background:linear-gradient(145deg,#80623c,#272018)}
+    .admin-phase-card:nth-child(3){background:linear-gradient(145deg,#4b5a5a,#172023)}
+    .admin-phase-card:nth-child(4){background:linear-gradient(145deg,#26394c,#101820)}
+    .admin-phase-card:nth-child(5){background:linear-gradient(145deg,#414b50,#171e22)}
+    .admin-phase-card:nth-child(6){background:linear-gradient(145deg,#24452d,#101c14)}
+    .admin-phase-card:nth-child(7){background:linear-gradient(145deg,#727d84,#222a30)}
     @media(max-width:600px){body.admin-page{padding:14px}.admin-header{align-items:flex-start;flex-direction:column}.admin-login{margin:5vh auto}.admin-toolbar{align-items:stretch}.admin-toolbar>button{width:100%}}
   </style>
 </head>
@@ -69,6 +84,19 @@
         </div>
         <div style="display:flex;gap:10px;flex-wrap:wrap"><button id="admin-play" class="admin-btn admin-primary" style="font-size:14px;padding:14px 22px">JOGAR</button><button id="admin-logout" class="admin-btn admin-secondary">SAIR DO PAINEL</button></div>
       </header>
+      <section class="admin-panel" style="margin-bottom:18px">
+        <h2>MAPAS / FASES DO JOGO</h2>
+        <p class="admin-sub">Selecione um quadro para abrir aquela fase diretamente e inspecionar o cenário. São sete ambientes disponíveis.</p>
+        <div class="admin-phase-grid">
+          <a class="admin-phase-card" href="/?phase=1"><b>FASE 01</b><strong>OLD TOWN</strong><small>Zona urbana em guerra • ruas, casas e blindado</small></a>
+          <a class="admin-phase-card" href="/?phase=2"><b>FASE 02</b><strong>RED DUNE</strong><small>Posto avançado no deserto • torres e dunas</small></a>
+          <a class="admin-phase-card" href="/?phase=3"><b>FASE 03</b><strong>IRON YARD</strong><small>Complexo industrial • tanques, galpões e guindastes</small></a>
+          <a class="admin-phase-card" href="/?phase=4"><b>FASE 04</b><strong>NIGHTFALL</strong><small>Base militar noturna • acampamento e perímetro</small></a>
+          <a class="admin-phase-card" href="/?phase=5"><b>FASE 05</b><strong>STEEL FANG</strong><small>Hangar fechado • estrutura metálica e depósitos</small></a>
+          <a class="admin-phase-card" href="/?phase=6"><b>FASE 06</b><strong>BLACKWOOD</strong><small>Selva fechada • floresta, árvores e cobertura natural</small></a>
+          <a class="admin-phase-card" href="/?phase=7"><b>FASE 07</b><strong>HIGH PASS</strong><small>Cordilheira • montanhas, rochas e terreno elevado</small></a>
+        </div>
+      </section>
       <div class="admin-toolbar">
         <div class="admin-stats">
           <div class="admin-stat"><b id="stat-total">0</b><span>CADASTROS</span></div>

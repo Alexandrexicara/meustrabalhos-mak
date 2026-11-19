@@ -251,6 +251,8 @@ const player={health:100,ammo:30,reserve:120,pistolAmmo:12,pistolReserve:48,rock
 const bots=[]; const bullets=[]; const enemyBullets=[]; const grenades=[]; const explosions=[]; const bloodParticles=[]; const clock=new THREE.Clock();
 let missionMarker=null,routeMarker=null,routeActive=false,missionKind='eliminate',missionProgress=0,missionDuration=0,missionX=0,missionZ=-8,missionDone=false; const raycaster=new THREE.Raycaster();
 const keys={}; let pointerLocked=false, elapsed=0, roundTime=120, recoil=0, bob=0, shotCooldown=0, toastTimeout;
+const isTouchDevice=window.matchMedia('(pointer: coarse)').matches||navigator.maxTouchPoints>0;
+let mobileFiring=false;
 const $=id=>document.getElementById(id);
 const startScreen=$('start-screen'),pauseScreen=$('pause-screen'),roundScreen=$('round-screen'),gameoverScreen=$('gameover-screen');
 const mapBounds=36;const supplyPickups=[];
@@ -490,7 +492,7 @@ function damageBot(bot,amount,impact,source='BULLET'){
  if(bot.health<=0)killBot(bot,source);
 }
 function shoot(){
- if(!player.active||!pointerLocked||player.reloading||shotCooldown>0)return;
+ if(!player.active||(!pointerLocked&&!isTouchDevice)||player.reloading||shotCooldown>0)return;
  const type=player.weaponType;if(type==='rifle'&&player.ammo<=0&&player.reserve<=0){setWeapon('pistol');toast('FUZIL SEM MUNIÇÃO // PISTOLA SACADA');return;}if(type==='pistol'&&player.pistolAmmo<=0){toast('PISTOLA VAZIA // PROCURE MUNIÇÃO');return;}if(type==='launcher'&&player.rocketAmmo<=0){setWeapon('rifle');toast('LANÇA-FOGUETES DESCARTADO // FUZIL RESTAURADO');return;}if(type==='rifle')player.ammo--;else if(type==='pistol')player.pistolAmmo--;else{player.rocketAmmo=0;toast('FOGUETE DISPARADO // LANÇADOR DESCARTÁVEL');}player.shots++;playSound(type==='launcher'?'explosion':'shot');shotCooldown=type==='pistol'?.32:type==='launcher'?1.1:.2;recoil=Math.min(recoil+(type==='launcher'?.18:.09),.3);
  muzzleFlash.visible=true;muzzleLight.intensity=17;
  muzzleFlash.scale.set(rand(.86,1.18),rand(.86,1.18),rand(.9,1.3));
@@ -512,7 +514,7 @@ function shoot(){
  updateHUD();
 }
 function throwGrenade(){
- if(!player.active||!pointerLocked||player.grenades<=0)return;
+ if(!player.active||(!pointerLocked&&!isTouchDevice)||player.grenades<=0)return;
  player.grenades--;updateHUD();toast('GRANADA LANÇADA // '+player.grenades+' RESTANTES');
  const grenade=new THREE.Mesh(new THREE.SphereGeometry(.105,12,10),mat(0x45513b,.72,.18));
  grenade.position.copy(camera.position).add(new THREE.Vector3(0,-.12,0));
@@ -545,13 +547,35 @@ function updateProjectiles(dt){
 }
 function reload(){if(!player.active||player.reloading)return;if(player.weaponType==='pistol'){if(player.pistolAmmo===12||player.pistolReserve<=0)return;player.reloading=true;playSound('reload');toast('SIDEARM RELOAD');setTimeout(()=>{const n=Math.min(12-player.pistolAmmo,player.pistolReserve);player.pistolAmmo+=n;player.pistolReserve-=n;player.reloading=false;updateHUD();},900);return;}if(player.weaponType==='launcher'){toast('AT-4 // DISPOSITIVO DE DISPARO ÚNICO');return;}if(player.ammo===30||player.reserve<=0){if(player.reserve<=0)setWeapon('pistol');return;}player.reloading=true;playSound('reload');toast('RELOADING');setTimeout(()=>{const n=Math.min(30-player.ammo,player.reserve);player.ammo+=n;player.reserve-=n;player.reloading=false;updateHUD();},1250);}
 function togglePause(){if(!player.active||!player.alive)return;if(pointerLocked){document.exitPointerLock();}else{canvas.requestPointerLock?.();}}
-function begin(){initAudio();startScreen.classList.add('hidden');player.active=true;spawnWave();canvas.requestPointerLock?.();toast('OPERATION LIVE // GOOD HUNT');}
-$('deploy-btn').addEventListener('click',begin);$('resume-btn').addEventListener('click',()=>canvas.requestPointerLock?.());
-$('next-round-btn').addEventListener('click',()=>{roundScreen.classList.add('hidden');player.round++;player.health=Math.min(100,player.health+18);player.ammo=30;player.reserve+=30;player.grenades=Math.min(5,player.grenades+1);player.active=true;spawnWave();updateHUD();canvas.requestPointerLock?.();});
-$('retry-btn').addEventListener('click',()=>{gameoverScreen.classList.add('hidden');player.health=100;player.ammo=30;player.reserve=120;player.pistolAmmo=12;player.pistolReserve=48;player.rocketAmmo=0;setWeapon('rifle');player.grenades=3;player.kills=0;player.shots=0;player.hits=0;player.round=1;player.alive=true;player.active=true;camera.position.set(0,1.72,8);spawnWave();updateHUD();canvas.requestPointerLock?.();});
-canvas.addEventListener('click',()=>{if(!pointerLocked&&player.active&&player.alive)canvas.requestPointerLock?.();});
+function begin(){initAudio();startScreen.classList.add('hidden');player.active=true;spawnWave();if(!isTouchDevice)canvas.requestPointerLock?.();toast('OPERATION LIVE // GOOD HUNT');}
+$('deploy-btn').addEventListener('click',begin);$('resume-btn').addEventListener('click',()=>{if(!isTouchDevice)canvas.requestPointerLock?.();});
+$('next-round-btn').addEventListener('click',()=>{roundScreen.classList.add('hidden');player.round++;player.health=Math.min(100,player.health+18);player.ammo=30;player.reserve+=30;player.grenades=Math.min(5,player.grenades+1);player.active=true;spawnWave();updateHUD();if(!isTouchDevice)canvas.requestPointerLock?.();});
+$('retry-btn').addEventListener('click',()=>{gameoverScreen.classList.add('hidden');player.health=100;player.ammo=30;player.reserve=120;player.pistolAmmo=12;player.pistolReserve=48;player.rocketAmmo=0;setWeapon('rifle');player.grenades=3;player.kills=0;player.shots=0;player.hits=0;player.round=1;player.alive=true;player.active=true;camera.position.set(0,1.72,8);spawnWave();updateHUD();if(!isTouchDevice)canvas.requestPointerLock?.();});
+canvas.addEventListener('click',()=>{if(!isTouchDevice&&!pointerLocked&&player.active&&player.alive)canvas.requestPointerLock?.();});
 document.addEventListener('pointerlockchange',()=>{pointerLocked=document.pointerLockElement===canvas;if(!pointerLocked&&player.active&&player.alive&&!startScreen.classList.contains('hidden'))return;if(!pointerLocked&&player.active&&player.alive){pauseScreen.classList.remove('hidden');}else{pauseScreen.classList.add('hidden');}});
 document.addEventListener('mousemove',e=>{if(!pointerLocked||!player.active)return;camera.rotation.order='YXZ';camera.rotation.y-=e.movementX*.0022;camera.rotation.x-=e.movementY*.0022;camera.rotation.x=THREE.MathUtils.clamp(camera.rotation.x,-1.35,1.35);});
+
+// Touchscreen controls: virtual movement stick, drag-to-look, and action buttons.
+if(isTouchDevice){
+ $('mobile-controls')?.classList.add('touch-enabled');
+ const stick=$('move-stick'),knob=$('move-knob'),look=$('mobile-look-zone');
+ let stickPointer=null,lookPointer=null,stickCenter={x:0,y:0},lookPoint={x:0,y:0};
+ const setMove=(x,y)=>{keys.KeyW=y<-.22;keys.KeyS=y>.22;keys.KeyA=x<-.22;keys.KeyD=x>.22;};
+ const resetStick=()=>{stickPointer=null;knob.style.transform='translate(0,0)';setMove(0,0);};
+ stick?.addEventListener('pointerdown',e=>{e.preventDefault();e.stopPropagation();stickPointer=e.pointerId;stick.setPointerCapture(e.pointerId);const r=stick.getBoundingClientRect();stickCenter={x:r.left+r.width/2,y:r.top+r.height/2};});
+ stick?.addEventListener('pointermove',e=>{if(e.pointerId!==stickPointer)return;e.preventDefault();const dx=e.clientX-stickCenter.x,dy=e.clientY-stickCenter.y,max=stick.clientWidth*.31,len=Math.hypot(dx,dy)||1,scale=Math.min(1,max/len),x=dx*scale,y=dy*scale;knob.style.transform='translate('+x+'px,'+y+'px)';setMove(x/max,y/max);});
+ stick?.addEventListener('pointerup',resetStick);stick?.addEventListener('pointercancel',resetStick);stick?.addEventListener('lostpointercapture',resetStick);
+ look?.addEventListener('pointerdown',e=>{if(e.target.closest('button')||e.target.closest('#move-stick'))return;e.preventDefault();lookPointer=e.pointerId;look.setPointerCapture(e.pointerId);lookPoint={x:e.clientX,y:e.clientY};});
+ look?.addEventListener('pointermove',e=>{if(e.pointerId!==lookPointer||!player.active)return;e.preventDefault();const dx=e.clientX-lookPoint.x,dy=e.clientY-lookPoint.y;lookPoint={x:e.clientX,y:e.clientY};camera.rotation.order='YXZ';camera.rotation.y-=dx*.004;camera.rotation.x=THREE.MathUtils.clamp(camera.rotation.x-dy*.004,-1.35,1.35);});
+ const stopLook=e=>{if(e.pointerId===lookPointer)lookPointer=null;};look?.addEventListener('pointerup',stopLook);look?.addEventListener('pointercancel',stopLook);
+ const bindHold=(id,down,up=()=>{})=>{const el=$(id);if(!el)return;el.addEventListener('pointerdown',e=>{e.preventDefault();e.stopPropagation();el.setPointerCapture(e.pointerId);down();});const end=e=>{e.preventDefault();up();};el.addEventListener('pointerup',end);el.addEventListener('pointercancel',end);el.addEventListener('lostpointercapture',up);};
+ bindHold('mobile-fire',()=>{mobileFiring=true;shoot();},()=>{mobileFiring=false;});
+ bindHold('mobile-jump',()=>{keys.Space=true;},()=>{keys.Space=false;});
+ $('mobile-grenade')?.addEventListener('pointerdown',e=>{e.preventDefault();e.stopPropagation();throwGrenade();});
+ $('mobile-reload')?.addEventListener('pointerdown',e=>{e.preventDefault();e.stopPropagation();reload();});
+ $('mobile-switch')?.addEventListener('pointerdown',e=>{e.preventDefault();e.stopPropagation();setWeapon(player.weaponType==='rifle'?'pistol':'rifle');});
+}
+document.addEventListener('contextmenu',e=>{if(isTouchDevice)e.preventDefault();});
 document.addEventListener('mousedown',e=>{if(e.button===0)shoot();if(e.button===2){e.preventDefault();throwGrenade();}});canvas.addEventListener('contextmenu',e=>e.preventDefault());document.addEventListener('keydown',e=>{keys[e.code]=true;if(e.code==='KeyR')reload();if(e.code==='Digit1')setWeapon('rifle');if(e.code==='Digit2')setWeapon('pistol');if(e.code==='Digit3'&&player.rocketAmmo>0)setWeapon('launcher');if(e.code==='KeyG')throwGrenade();if(e.code==='Escape'&&pointerLocked){};});document.addEventListener('keyup',e=>keys[e.code]=false);
 window.addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();const ratio=Math.min(window.devicePixelRatio||1,1.15);renderer.setPixelRatio(ratio);renderer.setSize(innerWidth,innerHeight,false);});
 let contextLost=false;
@@ -637,7 +661,7 @@ function update(dt){
  heliAttack-=dt;if(heliAttack<=0&&player.active&&player.alive){heliAttack=rand(2.2,3.5);const origin=patrolAircraft.position.clone().add(new THREE.Vector3(1,-.4,0));const target=camera.position.clone().add(new THREE.Vector3(rand(-1.5,1.5),0,rand(-1.5,1.5)));const dir=target.sub(origin).normalize();const bolt=new THREE.Mesh(new THREE.CylinderGeometry(.045,.045,.85,6),new THREE.MeshBasicMaterial({color:0xffb45e,emissive:0xff5522}));bolt.position.copy(origin);bolt.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0),dir);scene.add(bolt);heliBullets.push({mesh:bolt,velocity:dir.multiplyScalar(27),life:2.2});}
  for(let i=heliBullets.length-1;i>=0;i--){const b=heliBullets[i];b.mesh.position.addScaledVector(b.velocity,dt);b.life-=dt;if(b.mesh.position.distanceTo(camera.position)<.65){damagePlayer(10);b.life=-1;}if(b.life<=0){scene.remove(b.mesh);heliBullets.splice(i,1);}}
  for(const v of combatVehicles){v.fire-=dt;const target=new THREE.Vector3(camera.position.x-v.tank.position.x,0,camera.position.z-v.tank.position.z);v.turret.rotation.y=Math.atan2(target.x,target.z)-v.tank.rotation.y;if(v.fire<=0&&player.active){v.fire=rand(4,7);const start=v.tank.position.clone().add(new THREE.Vector3(0,2,0));const dir=new THREE.Vector3(camera.position.x-start.x,camera.position.y-start.y,camera.position.z-start.z).normalize();const shell=new THREE.Mesh(new THREE.SphereGeometry(.13,8,6),new THREE.MeshBasicMaterial({color:0xffa34d}));shell.position.copy(start);scene.add(shell);enemyBullets.push({mesh:shell,velocity:dir.multiplyScalar(22),life:1.8,damage:16});}}
- shotCooldown=Math.max(0,shotCooldown-dt);recoil=Math.max(0,recoil-dt*.55);
+ shotCooldown=Math.max(0,shotCooldown-dt);recoil=Math.max(0,recoil-dt*.55);if(isTouchDevice&&mobileFiring&&player.active)shoot();
  if(player.active&&player.alive){
   if(!routeActive){roundTime-=dt;if(roundTime<=0){roundTime=0;damagePlayer(12);roundTime=12;}updateTimer();}
   const forward=new THREE.Vector3(0,0,-1).applyQuaternion(camera.quaternion);forward.y=0;forward.normalize();const right=new THREE.Vector3().crossVectors(forward,new THREE.Vector3(0,1,0)).normalize();

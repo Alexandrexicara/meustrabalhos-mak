@@ -22,14 +22,14 @@ const signAdmin = email => jwt.sign({ email, role: 'admin' }, JWT, { expiresIn: 
 
 function auth(req, res, next) {
   try {
-    req.user = jwt.verify((req.headers.authorization || '').replace(/^Bearer\\s+/i, ''), JWT);
+    req.user = jwt.verify((req.headers.authorization || '').replace(/^Bearer\s+/i, ''), JWT);
     if (req.user.role !== 'player') return res.status(403).json({ error: 'Acesso de jogador não autorizado.' });
     next();
   } catch { res.status(401).json({ error: 'Faça login novamente.' }); }
 }
 function adminAuth(req, res, next) {
   try {
-    const token = (req.headers.authorization || '').replace(/^Bearer\\s+/i, '');
+    const token = (req.headers.authorization || '').replace(/^Bearer\s+/i, '');
     const user = jwt.verify(token, JWT);
     if (user.role !== 'admin' || user.email !== ADMIN_EMAIL) return res.status(403).json({ error: 'Acesso administrativo necessário.' });
     req.admin = user;

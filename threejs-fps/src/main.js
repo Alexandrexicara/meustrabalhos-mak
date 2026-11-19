@@ -290,7 +290,48 @@ const muzzleLight=new THREE.PointLight(0xffb34e,0,8,1.7);muzzleLight.position.se
 weapon.position.set(0,0,0);
 const pistol=new THREE.Group();camera.add(pistol);pistol.visible=false;
 const pbox=(x,y,z,a,b,c,m)=>{const o=new THREE.Mesh(new THREE.BoxGeometry(a,b,c),m);o.position.set(x,y,z);pistol.add(o);};pbox(.34,-.31,-.55,.13,.16,.38,gunMat);pbox(.34,-.4,-.5,.11,.24,.13,gunPolymer);
-const launcher=new THREE.Group();camera.add(launcher);launcher.visible=false;const tube=new THREE.Mesh(new THREE.CylinderGeometry(.11,.13,1.05,12),gunMat);tube.rotation.x=Math.PI/2;tube.position.set(.34,-.25,-.8);launcher.add(tube);const grip=new THREE.Mesh(new THREE.BoxGeometry(.13,.24,.18),gunPolymer);grip.position.set(.34,-.42,-.55);launcher.add(grip);function loadOptionalWeaponModel(type,path,group,offset){
+const launcher=new THREE.Group();camera.add(launcher);launcher.visible=false;
+const tube=new THREE.Mesh(new THREE.CylinderGeometry(.11,.13,1.05,16,1,true),gunMat);tube.rotation.x=Math.PI/2;tube.position.set(.34,-.25,-.8);launcher.add(tube);
+const tubeFront=new THREE.Mesh(new THREE.TorusGeometry(.12,.025,8,20),gunAccent);tubeFront.position.set(.34,-.25,-1.325);launcher.add(tubeFront);
+const tubeRear=new THREE.Mesh(new THREE.TorusGeometry(.135,.022,8,20),gunMat);tubeRear.position.set(.34,-.25,-.275);launcher.add(tubeRear);
+const grip=new THREE.Mesh(new THREE.BoxGeometry(.13,.24,.18),gunPolymer);grip.position.set(.34,-.42,-.55);launcher.add(grip);
+const rocketRound=new THREE.Group();rocketRound.name='AT4_VISIBLE_ROCKET';launcher.add(rocketRound);rocketRound.position.set(.34,-.25,-.82);
+const rocketBody=new THREE.Mesh(new THREE.CylinderGeometry(.072,.072,.83,12),mat(0x536044,.5,.22));rocketBody.rotation.x=Math.PI/2;rocketRound.add(rocketBody);
+const rocketNose=new THREE.Mesh(new THREE.ConeGeometry(.072,.22,12),mat(0x9a9d83,.4,.3));rocketNose.rotation.x=-Math.PI/2;rocketNose.position.z=-.525;rocketRound.add(rocketNose);
+const rocketBand=new THREE.Mesh(new THREE.CylinderGeometry(.078,.078,.09,12),gunMat);rocketBand.rotation.x=Math.PI/2;rocketBand.position.z=.22;rocketRound.add(rocketBand);
+for(let k=0;k<4;k++){const fin=new THREE.Mesh(new THREE.BoxGeometry(.16,.012,.18),gunAccent);fin.position.set(0,0,.39);fin.rotation.z=k*Math.PI/2;rocketRound.add(fin);}
+const rocketProjectiles=[];
+function createRocketProjectile(origin,direction){
+ const rocket=new THREE.Group();
+ const body=new THREE.Mesh(new THREE.CylinderGeometry(.075,.075,.9,12),mat(0x596748,.45,.25));body.rotation.x=Math.PI/2;rocket.add(body);
+ const nose=new THREE.Mesh(new THREE.ConeGeometry(.075,.24,12),mat(0xb5b59a,.38,.28));nose.rotation.x=-Math.PI/2;nose.position.z=-.57;rocket.add(nose);
+ const band=new THREE.Mesh(new THREE.CylinderGeometry(.082,.082,.1,12),gunMat);band.rotation.x=Math.PI/2;band.position.z=.27;rocket.add(band);
+ for(let k=0;k<4;k++){const fin=new THREE.Mesh(new THREE.BoxGeometry(.18,.014,.2),gunAccent);fin.position.set(0,0,.4);fin.rotation.z=k*Math.PI/2;rocket.add(fin);}
+ const flame=new THREE.Mesh(new THREE.ConeGeometry(.13,.48,10),new THREE.MeshBasicMaterial({color:0xff8a28,transparent:true,opacity:.9}));flame.rotation.x=Math.PI/2;flame.position.z=.65;rocket.add(flame);
+ const smoke=new THREE.Mesh(new THREE.SphereGeometry(.12,8,6),new THREE.MeshBasicMaterial({color:0x77736b,transparent:true,opacity:.35,depthWrite:false}));smoke.position.z=.8;rocket.add(smoke);
+ rocket.position.copy(origin);rocket.quaternion.setFromUnitVectors(new THREE.Vector3(0,0,-1),direction.clone().normalize());scene.add(rocket);
+ rocketProjectiles.push({mesh:rocket,velocity:direction.clone().normalize().multiplyScalar(42),life:4});
+}
+function detonateRocket(projectile,point){
+ const blast=new THREE.Mesh(new THREE.SphereGeometry(2.5,18,14),new THREE.MeshBasicMaterial({color:0xff8b32,transparent:true,opacity:.9,depthWrite:false}));blast.position.copy(point);scene.add(blast);explosions.push({mesh:blast,age:0});
+ const flash=new THREE.PointLight(0xff9a42,5,16);flash.position.copy(point);scene.add(flash);setTimeout(()=>scene.remove(flash),450);
+ playSound('explosion');toast('IMPACTO DO AT-4 // EXPLOSÃO');scene.remove(projectile.mesh);
+}
+function updateRocketProjectiles(dt){
+ for(let i=rocketProjectiles.length-1;i>=0;i--){
+  const p=rocketProjectiles[i],previous=p.mesh.position.clone(),step=p.velocity.clone().multiplyScalar(dt),distance=step.length();
+  p.mesh.position.add(step);p.life-=dt;
+  if(!helicopterDestroyed&&patrolAircraft.visible){
+   const heliHit=raycaster.intersectObject(patrolAircraft,true).find(h=>h.object.visible);
+   if(heliHit&&heliHit.point.distanceTo(previous)<=distance+1.1){helicopterDestroyed=true;patrolAircraft.visible=false;for(const b of heliBullets)scene.remove(b.mesh);heliBullets.length=0;detonateRocket(p,heliHit.point);rocketProjectiles.splice(i,1);toast('HELICÓPTERO DERRUBADO // ALVO DESTRUÍDO');continue;}
+  }
+  raycaster.set(previous,step.clone().normalize());raycaster.far=distance;
+  const obstacle=raycaster.intersectObjects(world.children,true).find(h=>h.object.isMesh&&h.object.visible);
+  if(obstacle&&obstacle.distance<=distance+.1){detonateRocket(p,obstacle.point);rocketProjectiles.splice(i,1);continue;}
+  if(p.life<=0){scene.remove(p.mesh);rocketProjectiles.splice(i,1);}
+ }
+}
+function loadOptionalWeaponModel(type,path,group,offset){
  fetch(path,{method:'HEAD'}).then(r=>{if(!r.ok)return;new GLTFLoader().load(path,gltf=>{
   const model=gltf.scene;model.updateMatrixWorld(true);const bounds=new THREE.Box3().setFromObject(model),size=bounds.getSize(new THREE.Vector3()),center=bounds.getCenter(new THREE.Vector3()),largest=Math.max(size.x,size.y,size.z)||1,scale=(type==='rifle'?1.55:type==='pistol'?.82:1.25)/largest;
   model.scale.setScalar(scale);model.position.set(offset.x-center.x*scale,offset.y-center.y*scale,offset.z-center.z*scale);
@@ -301,7 +342,7 @@ const launcher=new THREE.Group();camera.add(launcher);launcher.visible=false;con
 loadOptionalWeaponModel('rifle','/assets/weapons/rifle.glb',weapon,{x:.34,y:-.32,z:-.86});
 loadOptionalWeaponModel('pistol','/assets/weapons/pistol.glb',pistol,{x:.34,y:-.32,z:-.58});
 loadOptionalWeaponModel('launcher','/assets/weapons/at4.glb',launcher,{x:.34,y:-.3,z:-.78});
-function setWeapon(type){player.weaponType=type;weapon.visible=type==='rifle';pistol.visible=type==='pistol';launcher.visible=type==='launcher';const data={rifle:['VX-9 RANGER','5.56 × 45 MM // ASSAULT RIFLE','01 / PRIMARY','/assets/icons/rifle.svg','/assets/icons/rifle-ammo.svg'],pistol:['M9 SIDEARM','9 × 19 MM // SEMI-AUTO','02 / SIDEARM','/assets/icons/pistol.svg','/assets/icons/pistol-ammo.svg'],launcher:['AT-4 ROCKET','84 MM // ANTI-ARMOR','03 / HEAVY','/assets/icons/at4.svg','/assets/icons/rocket-ammo.svg']}[type];$('weapon-name').textContent=data[0];$('weapon-desc').textContent=data[1];$('weapon-slot').textContent=data[2];$('weapon-image').src=data[3];$('ammo-image').src=data[4];$('weapon-image').alt=data[0];$('ammo-image').alt=data[1];updateHUD();}
+function setWeapon(type){player.weaponType=type;if(type==='launcher')rocketRound.visible=player.rocketAmmo>0;weapon.visible=type==='rifle';pistol.visible=type==='pistol';launcher.visible=type==='launcher';const data={rifle:['VX-9 RANGER','5.56 × 45 MM // ASSAULT RIFLE','01 / PRIMARY','/assets/icons/rifle.svg','/assets/icons/rifle-ammo.svg'],pistol:['M9 SIDEARM','9 × 19 MM // SEMI-AUTO','02 / SIDEARM','/assets/icons/pistol.svg','/assets/icons/pistol-ammo.svg'],launcher:['AT-4 ROCKET','84 MM // ANTI-ARMOR','03 / HEAVY','/assets/icons/at4.svg','/assets/icons/rocket-ammo.svg']}[type];$('weapon-name').textContent=data[0];$('weapon-desc').textContent=data[1];$('weapon-slot').textContent=data[2];$('weapon-image').src=data[3];$('ammo-image').src=data[4];$('weapon-image').alt=data[0];$('ammo-image').alt=data[1];updateHUD();}
 const supplyArtCache=new Map();
 const supplyArtPaths={rifle:'/assets/icons/rifle-ammo.svg',pistol:'/assets/icons/pistol-ammo.svg',grenade:'/assets/icons/grenade-ammo.svg',launcher:'/assets/icons/at4.svg'};
 const supplyLabels={rifle:'MUNICAO DE FUZIL  +60',pistol:'MUNICAO DE PISTOLA  +24',grenade:'GRANADAS  +2',launcher:'LANCADOR AT-4  /  1 FOGUETE'};
@@ -595,10 +636,9 @@ function shoot(){
  const tracerGeo=new THREE.BufferGeometry().setFromPoints([muzzleWorld,tracerEnd]);
  const tracer=new THREE.Line(tracerGeo,new THREE.LineBasicMaterial({color:0xffdf91,transparent:true,opacity:.95,blending:THREE.AdditiveBlending,depthWrite:false}));
  scene.add(tracer);setTimeout(()=>{scene.remove(tracer);tracer.geometry.dispose();tracer.material.dispose();},75);
+ if(type==='launcher'){const origin=launcher.localToWorld(new THREE.Vector3(.34,-.25,-1.42));const direction=new THREE.Vector3(0,0,-1).applyQuaternion(camera.quaternion).normalize();rocketRound.visible=false;createRocketProjectile(origin,direction);}
  const targets=[];for(const b of bots)if(b.alive)b.group.traverse(o=>{if(o.isMesh&&!o.userData.noHit&&o.geometry.type!=='PlaneGeometry')targets.push(o);});
- const hit=raycaster.intersectObjects(targets,false)[0];
- const helicopterHit=type==='launcher'&&!helicopterDestroyed?raycaster.intersectObject(patrolAircraft,true)[0]:null;
- if(helicopterHit&&(!hit||helicopterHit.distance<hit.distance)){helicopterDestroyed=true;patrolAircraft.visible=false;heliBullets.forEach(b=>scene.remove(b.mesh));heliBullets.length=0;playSound('explosion');const blast=new THREE.Mesh(new THREE.SphereGeometry(2.2,18,14),new THREE.MeshBasicMaterial({color:0xff8b32,transparent:true,opacity:.9,depthWrite:false}));blast.position.copy(helicopterHit.point);scene.add(blast);explosions.push({mesh:blast,age:0});toast('HELICÓPTERO DERRUBADO // ALVO DESTRUÍDO');}
+ const hit=type==='launcher'?null:raycaster.intersectObjects(targets,false)[0];
  const crateHits=raycaster.intersectObjects(destructibleCrates.filter(c=>c.alive).flatMap(c=>c.group.children),false);const crateHit=crateHits[0];
  if(crateHit&&(!hit||crateHit.distance<hit.distance)){const owner=destructibleCrates.find(c=>c.alive&&c.group===crateHit.object.parent);const normal=crateHit.face?crateHit.face.normal.clone().transformDirection(crateHit.object.matrixWorld):new THREE.Vector3(0,0,1);if(owner)damageCrate(owner,type==='launcher'?100:type==='pistol'?7:12,crateHit.point,normal);if(type==='launcher'){damageCratesInBlast(crateHit.point,7,150);const blast=new THREE.Mesh(new THREE.SphereGeometry(.8,14,10),new THREE.MeshBasicMaterial({color:0xff9a42,transparent:true,opacity:.65,depthWrite:false}));blast.position.copy(crateHit.point);scene.add(blast);explosions.push({mesh:blast,age:0});}}
  else if(hit){playSound('hit');const bot=bots.find(b=>{if(!b.alive)return false;let node=hit.object;while(node){if(node===b.group)return true;node=node.parent;}return false;});if(bot){bot.fire=Math.min(bot.fire,.35);player.hits++;const damage=type==='pistol'?24:type==='launcher'?150:34;damageBot(bot,damage,hit.point,type==='launcher'?'ROCKET':'BULLET');if(type==='launcher'){const blast=new THREE.Mesh(new THREE.SphereGeometry(1,14,10),new THREE.MeshBasicMaterial({color:0xff9a42,transparent:true,opacity:.65,depthWrite:false}));blast.position.copy(hit.point);scene.add(blast);explosions.push({mesh:blast,age:0});for(const other of bots){const d=other.group.position.distanceTo(hit.point);if(other!==bot&&other.alive&&d<8)damageBot(other,Math.round(150*(1-d/8)),hit.point,'ROCKET');}}$('hit-marker').classList.add('show');setTimeout(()=>$('hit-marker').classList.remove('show'),100);}}
@@ -779,7 +819,7 @@ function update(dt){
  heliAttack-=dt;if(heliAttack<=0&&player.active&&player.alive){heliAttack=rand(2.2,3.5);const origin=patrolAircraft.position.clone().add(new THREE.Vector3(1,-.4,0));const target=camera.position.clone().add(new THREE.Vector3(rand(-1.5,1.5),0,rand(-1.5,1.5)));const dir=target.sub(origin).normalize();const bolt=new THREE.Mesh(new THREE.CylinderGeometry(.045,.045,.85,6),new THREE.MeshBasicMaterial({color:0xffb45e,emissive:0xff5522}));bolt.position.copy(origin);bolt.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0),dir);scene.add(bolt);heliBullets.push({mesh:bolt,velocity:dir.multiplyScalar(27),life:2.2});}
  for(let i=heliBullets.length-1;i>=0;i--){const b=heliBullets[i];b.mesh.position.addScaledVector(b.velocity,dt);b.life-=dt;if(b.mesh.position.distanceTo(camera.position)<.65){damagePlayer(10);b.life=-1;}if(b.life<=0){scene.remove(b.mesh);heliBullets.splice(i,1);}}
  for(const v of combatVehicles){v.fire-=dt;const target=new THREE.Vector3(camera.position.x-v.tank.position.x,0,camera.position.z-v.tank.position.z);v.turret.rotation.y=Math.atan2(target.x,target.z)-v.tank.rotation.y;if(v.fire<=0&&player.active){v.fire=rand(4,7);const start=v.tank.position.clone().add(new THREE.Vector3(0,2,0));const dir=new THREE.Vector3(camera.position.x-start.x,camera.position.y-start.y,camera.position.z-start.z).normalize();const shell=new THREE.Mesh(new THREE.SphereGeometry(.13,8,6),new THREE.MeshBasicMaterial({color:0xffa34d}));shell.position.copy(start);scene.add(shell);enemyBullets.push({mesh:shell,velocity:dir.multiplyScalar(22),life:1.8,damage:16});}}
- shotCooldown=Math.max(0,shotCooldown-dt);recoil=Math.max(0,recoil-dt*.55);if(isTouchDevice&&mobileFiring&&player.active)shoot();
+ updateRocketProjectiles(dt);shotCooldown=Math.max(0,shotCooldown-dt);recoil=Math.max(0,recoil-dt*.55);if(isTouchDevice&&mobileFiring&&player.active)shoot();
  if(player.active&&player.alive){
   if(!routeActive){roundTime-=dt;if(roundTime<=0){roundTime=0;damagePlayer(12);roundTime=12;}updateTimer();}
   const forward=new THREE.Vector3(0,0,-1).applyQuaternion(camera.quaternion);forward.y=0;forward.normalize();const right=new THREE.Vector3().crossVectors(forward,new THREE.Vector3(0,1,0)).normalize();

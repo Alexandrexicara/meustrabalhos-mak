@@ -22,6 +22,7 @@
         <button id="mobile-switch" class="touch-action small-action" aria-label="Trocar arma">TROCAR ARMA</button>
       </div>
     </div>
+    <section id="license-gate" class="license-gate"><div class="license-card"><div class="eyebrow">TACTICAL STRIKE // ACESSO</div><h2>LIBERE SUA OPERAÇÃO</h2><p>Crie sua conta ou entre para adquirir a licença permanente por <strong>R$ 10,00</strong>.</p><form id="license-form"><label>E-mail<input id="license-email" type="email" required autocomplete="email" placeholder="seu@email.com"></label><label>Senha<input id="license-password" type="password" required minlength="8" autocomplete="current-password" placeholder="Mínimo de 8 caracteres"></label><div class="license-actions"><button type="submit" value="login">ENTRAR</button><button type="submit" value="register">CRIAR CONTA</button></div></form><p id="license-status" role="status">Conectando ao servidor...</p><div id="payment-panel" class="hidden"><p>Faça um Pix de <strong>R$ 10,00</strong> para a chave:</p><p class="pix-key">santossilvac992@gmail.com</p><button id="pix-copy" type="button">COPIAR CHAVE PIX</button><button id="whatsapp-proof" type="button">ENVIAR COMPROVANTE PELO WHATSAPP</button><button id="check-license" type="button">JÁ PAGUEI — VERIFICAR ACESSO</button><button id="license-logout" type="button" class="license-logout">SAIR DA CONTA</button><small>A liberação é manual após a conferência do comprovante.</small></div></div></section>
     <div class="vignette"></div>
     <header class="topbar">
       <div class="brand"><span class="brand-mark">✦</span><div><strong>TACTICAL<span> STRIKE</span></strong><small>COMBAT SIMULATION // 03</small></div></div>
@@ -47,6 +48,7 @@
     <div class="gameover-screen hidden" id="gameover-screen"><div class="eyebrow">MISSION FAILURE</div><h2>OPERATOR DOWN</h2><p id="gameover-copy">Your combat run has ended.</p><button id="retry-btn">RESTART OPERATION</button></div>
     <div class="toast" id="toast"></div>
   </div>
+  <script type="module" src="/src/license.js"></script>
   <script type="module" src="/src/main.js"></script>
 </body>
 </html>

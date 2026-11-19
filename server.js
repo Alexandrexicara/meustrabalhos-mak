@@ -79,7 +79,7 @@ app.post('/api/payment/request', auth, wrap(async (req, res) => {
 
 function adminGameAuth(req, res, next) {
   try {
-    const token = (req.headers.authorization || '').replace(/^Bearer\\s+/i, '');
+    const token = (req.headers.authorization || '').replace(/^Bearer\s+/i, '');
     const user = jwt.verify(token, JWT);
     if (user.role !== 'admin_game' || user.email !== ADMIN_EMAIL) return res.status(403).json({ error: 'Acesso administrativo ao jogo não autorizado.' });
     req.admin = user;

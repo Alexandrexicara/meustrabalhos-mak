@@ -174,24 +174,29 @@ let heliAttack=rand(2.5,4.5);const heliBullets=[];
 
 const weapon = new THREE.Group(); camera.add(weapon); scene.add(camera);
 
-// First-person operator equipment: articulated sleeves, tactical gloves and uniform.
+// First-person operator rig: separate shoulder pivots keep both hands aligned with the weapon.
 const operatorBody=new THREE.Group();camera.add(operatorBody);
 const uniformMat=new THREE.MeshStandardMaterial({color:0x48523b,roughness:.94});
 const uniformDark=new THREE.MeshStandardMaterial({color:0x252d27,roughness:.9});
 const gloveMat=new THREE.MeshStandardMaterial({color:0x202522,roughness:.82});
 const seamMat=new THREE.MeshStandardMaterial({color:0x697454,roughness:.9});
 function limbBetween(parent,a,b,radius,material){const av=new THREE.Vector3(...a),bv=new THREE.Vector3(...b),d=bv.clone().sub(av);const mesh=new THREE.Mesh(new THREE.CapsuleGeometry(radius,Math.max(.06,d.length()-radius*2),6,10),material);mesh.position.copy(av.add(bv).multiplyScalar(.5));mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0),d.normalize());mesh.castShadow=true;parent.add(mesh);return mesh;}
-function gloveHand(x,y,z,scale=1){const hand=new THREE.Group();hand.position.set(x,y,z);hand.scale.setScalar(scale);operatorBody.add(hand);const palm=new THREE.Mesh(new THREE.BoxGeometry(.14,.105,.19),gloveMat);palm.rotation.x=-.18;hand.add(palm);for(let i=0;i<4;i++){const finger=new THREE.Mesh(new THREE.CapsuleGeometry(.021,.075,4,7),gloveMat);finger.position.set(-.047+i*.031,-.018,-.105);finger.rotation.x=-.35;hand.add(finger);}const thumb=new THREE.Mesh(new THREE.CapsuleGeometry(.025,.075,4,7),gloveMat);thumb.position.set(.085,-.005,-.025);thumb.rotation.z=-.85;hand.add(thumb);return hand;}
-// Sleeves extend from both shoulders toward the weapon, with reinforced cuffs.
-limbBetween(operatorBody,[-.64,-.58,-.16],[-.22,-.42,-.76],.115,uniformMat);
-limbBetween(operatorBody,[.64,-.58,-.16],[.40,-.43,-.68],.12,uniformMat);
-limbBetween(operatorBody,[-.22,-.42,-.76],[-.15,-.405,-.88],.105,uniformDark);
-limbBetween(operatorBody,[.40,-.43,-.68],[.36,-.42,-.82],.105,uniformDark);
-const cuffGeo=new THREE.TorusGeometry(.104,.018,7,14);
-for(const p of [[-.15,-.405,-.88],[.36,-.42,-.82]]){const cuff=new THREE.Mesh(cuffGeo,seamMat);cuff.position.set(...p);cuff.rotation.x=Math.PI/2;operatorBody.add(cuff);}
-gloveHand(-.13,-.39,-.91,.92);gloveHand(.36,-.40,-.88,.88);
-// Subtle sleeve stitching and elbow reinforcement.
+function gloveHand(parent,x,y,z,scale=1){const hand=new THREE.Group();hand.position.set(x,y,z);hand.scale.setScalar(scale);parent.add(hand);const palm=new THREE.Mesh(new THREE.BoxGeometry(.14,.105,.19),gloveMat);palm.rotation.x=-.18;hand.add(palm);for(let i=0;i<4;i++){const finger=new THREE.Mesh(new THREE.CapsuleGeometry(.021,.075,4,7),gloveMat);finger.position.set(-.047+i*.031,-.018,-.105);finger.rotation.x=-.35;hand.add(finger);}const thumb=new THREE.Mesh(new THREE.CapsuleGeometry(.025,.075,4,7),gloveMat);thumb.position.set(.085,-.005,-.025);thumb.rotation.z=-.85;hand.add(thumb);return hand;}
+const rightArmRig=new THREE.Group();rightArmRig.position.set(.64,-.58,-.16);operatorBody.add(rightArmRig);
+limbBetween(rightArmRig,[0,0,0],[-.24,.16,-.52],.12,uniformMat);
+limbBetween(rightArmRig,[-.24,.16,-.52],[-.28,.16,-.68],.105,uniformDark);
+const rightCuff=new THREE.Mesh(new THREE.TorusGeometry(.104,.018,7,14),seamMat);rightCuff.position.set(-.28,.16,-.68);rightCuff.rotation.x=Math.PI/2;rightArmRig.add(rightCuff);
+gloveHand(rightArmRig,-.28,.18,-.74,.88);
+const leftArmRig=new THREE.Group();leftArmRig.position.set(-.64,-.58,-.16);operatorBody.add(leftArmRig);
+limbBetween(leftArmRig,[0,0,0],[.40,.16,-.50],.115,uniformMat);
+limbBetween(leftArmRig,[.40,.16,-.50],[.88,.18,-.72],.105,uniformDark);
+const leftCuff=new THREE.Mesh(new THREE.TorusGeometry(.104,.018,7,14),seamMat);leftCuff.position.set(.88,.18,-.72);leftCuff.rotation.x=Math.PI/2;leftArmRig.add(leftCuff);
+const leftHand=gloveHand(leftArmRig,.88,.20,-.78,.92);
+// Reinforced shoulder/elbow stitching remains visible while the arms animate.
 for(const side of [-1,1]){const patch=new THREE.Mesh(new THREE.BoxGeometry(.12,.018,.16),seamMat);patch.position.set(side*.52,-.57,-.35);patch.rotation.z=side*.28;operatorBody.add(patch);}
+let grenadeThrowAge=-1;
+const grenadeInHand=new THREE.Mesh(new THREE.SphereGeometry(.105,12,10),mat(0x45513b,.72,.18));
+grenadeInHand.position.set(0,-.015,-.18);grenadeInHand.visible=false;leftHand.add(grenadeInHand);
 // Lower-body model is revealed only when the operator looks down.
 const operatorLegs=new THREE.Group();camera.add(operatorLegs);operatorLegs.visible=false;
 for(const side of [-1,1]){
@@ -547,13 +552,38 @@ function shoot(){
  updateHUD();
 }
 function throwGrenade(){
- if(!player.active||(!pointerLocked&&!isTouchDevice)||player.grenades<=0)return;
- player.grenades--;updateHUD();toast('GRANADA LANÇADA // '+player.grenades+' RESTANTES');
+ if(!player.active||(!pointerLocked&&!isTouchDevice)||player.grenades<=0||grenadeThrowAge>=0)return;
+ player.grenades--;updateHUD();toast('LANÇAMENTO // '+player.grenades+' GRANADAS RESTANTES');
+ grenadeInHand.visible=true;grenadeThrowAge=0;
+}
+function releaseGrenadeFromLeftHand(){
+ leftArmRig.updateMatrixWorld(true);const start=new THREE.Vector3();grenadeInHand.getWorldPosition(start);
+ grenadeInHand.visible=false;
  const grenade=new THREE.Mesh(new THREE.SphereGeometry(.105,12,10),mat(0x45513b,.72,.18));
- grenade.position.copy(camera.position).add(new THREE.Vector3(0,-.12,0));
+ grenade.position.copy(start);grenade.castShadow=true;scene.add(grenade);
  const direction=new THREE.Vector3(0,0,-1).applyQuaternion(camera.quaternion);
  const velocity=direction.multiplyScalar(12).add(new THREE.Vector3(0,5.5,0));
- grenade.castShadow=true;scene.add(grenade);grenades.push({mesh:grenade,velocity,fuse:2.15,bounced:false});
+ // The throw begins at the left glove, not at the camera center.
+ grenades.push({mesh:grenade,velocity,fuse:2.15,bounced:false});
+}
+function updateFirstPersonRig(dt){
+ const walking=Math.sin(bob*1.7)*.008;
+ operatorBody.position.y=walking;
+ rightArmRig.rotation.x=-recoil*.62;
+ rightArmRig.rotation.z=Math.sin(bob*.85)*.012;
+ if(grenadeThrowAge>=0){
+  grenadeThrowAge+=dt;
+  const t=grenadeThrowAge;
+  // Pull the left arm back, drive it forward, release from the glove, then recover.
+  if(t<.22){const k=t/.22;leftArmRig.rotation.y=-.48*k;leftArmRig.rotation.x=.12*k;}
+  else if(t<.42){const k=(t-.22)/.20;leftArmRig.rotation.y=THREE.MathUtils.lerp(-.48,.92,k);leftArmRig.rotation.x=THREE.MathUtils.lerp(.12,-.22,k);}
+  else if(t<.70){const k=(t-.42)/.28;leftArmRig.rotation.y=THREE.MathUtils.lerp(.92,0,k);leftArmRig.rotation.x=THREE.MathUtils.lerp(-.22,0,k);}
+  else{leftArmRig.rotation.set(0,0,0);grenadeThrowAge=-1;}
+  if(t>=.37&&grenadeInHand.visible)releaseGrenadeFromLeftHand();
+ }else{
+  leftArmRig.rotation.y=Math.sin(bob*.85)*.012;
+  leftArmRig.rotation.x=walking*.7;
+ }
 }
 function detonateGrenade(g){
  const center=g.mesh.position.clone();scene.remove(g.mesh);playSound('explosion');damageCratesInBlast(center,7,190);
@@ -704,7 +734,7 @@ function update(dt){
   if(keys.Space&&player.onGround){player.velocity.y=5.1;player.onGround=false;}player.velocity.y-=14*dt;
   if(player.onGround){camera.position.y=THREE.MathUtils.damp(camera.position.y,eyeHeight,18,dt);if(Math.abs(camera.position.y-eyeHeight)<.015)camera.position.y=eyeHeight;}
   else{camera.position.y+=player.velocity.y*dt;if(camera.position.y<=eyeHeight){camera.position.y=eyeHeight;player.velocity.y=0;player.onGround=true;}}
-  weapon.position.y=Math.sin(bob*1.7)*.012-recoil*.5+(crouched?-.22:0);weapon.position.x=Math.cos(bob*.85)*.008;weapon.rotation.x=-recoil+(crouched?.035:0);operatorBody.position.y=(crouched?-.18:0)+Math.sin(bob*1.7)*.008;operatorLegs.visible=camera.rotation.x<-.32;operatorLegs.position.y=crouched?-.12:0;
+  weapon.position.y=Math.sin(bob*1.7)*.012-recoil*.5+(crouched?-.22:0);weapon.position.x=Math.cos(bob*.85)*.008;weapon.rotation.x=-recoil+(crouched?.035:0);operatorBody.position.y+=(crouched?-.18:0);operatorLegs.visible=camera.rotation.x<-.20;operatorLegs.position.y=crouched?-.12:0;updateFirstPersonRig(dt);
   updateBots(dt);updateProjectiles(dt);for(const p of supplyPickups){p.phase+=dt*1.8;p.icon.position.y=p.baseY+Math.sin(p.phase)*.09;p.label.position.y=.72+Math.sin(p.phase)*.09;}collectSupplyPickups();updateMission(dt);updateCampaignRoute(dt);
   if(Math.floor(elapsed*3)%2===0)updateRadar();
  }

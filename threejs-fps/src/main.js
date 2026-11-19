@@ -299,12 +299,17 @@ function rand(min,max){return min+Math.random()*(max-min)}
 function toast(message){$('toast').textContent=message;$('toast').classList.add('show');clearTimeout(toastTimeout);toastTimeout=setTimeout(()=>$('toast').classList.remove('show'),1700)}
 let audioCtx=null,masterGain=null,ambientStarted=false,lastStepSound=0;
 function initAudio(){
- if(audioCtx)return;
  const AC=window.AudioContext||window.webkitAudioContext;if(!AC)return;
- audioCtx=new AC();masterGain=audioCtx.createGain();masterGain.gain.value=.42;masterGain.connect(audioCtx.destination);
- if(audioCtx.state==='suspended')audioCtx.resume();
+ if(!audioCtx){
+  audioCtx=new AC();masterGain=audioCtx.createGain();masterGain.gain.value=.42;masterGain.connect(audioCtx.destination);
+ }
+ // Mobile browsers may suspend audio after tab changes or interruptions.
+ // Always attempt to resume on a fresh user gesture, even after context creation.
+ if(audioCtx.state==='suspended')audioCtx.resume().catch(()=>{});
  startAmbientAudio();
 }
+document.addEventListener('pointerdown',()=>{if(player.active&&audioCtx?.state==='suspended')audioCtx.resume().catch(()=>{});},{passive:true});
+document.addEventListener('visibilitychange',()=>{if(!document.hidden&&player.active&&audioCtx?.state==='suspended')audioCtx.resume().catch(()=>{});});
 function tone(freq,duration,type='sine',volume=.08,slide=0){
  if(!audioCtx)return;const now=audioCtx.currentTime,osc=audioCtx.createOscillator(),gain=audioCtx.createGain();
  osc.type=type;osc.frequency.setValueAtTime(freq,now);if(slide)osc.frequency.exponentialRampToValueAtTime(Math.max(25,freq+slide),now+duration);

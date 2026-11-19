@@ -173,6 +173,39 @@ patrolAircraft.scale.set(1.45,1.45,1.45);patrolAircraft.position.set(-48,15,-34)
 let heliAttack=rand(2.5,4.5);const heliBullets=[];
 
 const weapon = new THREE.Group(); camera.add(weapon); scene.add(camera);
+
+// First-person operator equipment: articulated sleeves, tactical gloves and uniform.
+const operatorBody=new THREE.Group();camera.add(operatorBody);
+const uniformMat=new THREE.MeshStandardMaterial({color:0x48523b,roughness:.94});
+const uniformDark=new THREE.MeshStandardMaterial({color:0x252d27,roughness:.9});
+const gloveMat=new THREE.MeshStandardMaterial({color:0x202522,roughness:.82});
+const seamMat=new THREE.MeshStandardMaterial({color:0x697454,roughness:.9});
+function limbBetween(parent,a,b,radius,material){const av=new THREE.Vector3(...a),bv=new THREE.Vector3(...b),d=bv.clone().sub(av);const mesh=new THREE.Mesh(new THREE.CapsuleGeometry(radius,Math.max(.06,d.length()-radius*2),6,10),material);mesh.position.copy(av.add(bv).multiplyScalar(.5));mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0),d.normalize());mesh.castShadow=true;parent.add(mesh);return mesh;}
+function gloveHand(x,y,z,scale=1){const hand=new THREE.Group();hand.position.set(x,y,z);hand.scale.setScalar(scale);operatorBody.add(hand);const palm=new THREE.Mesh(new THREE.BoxGeometry(.14,.105,.19),gloveMat);palm.rotation.x=-.18;hand.add(palm);for(let i=0;i<4;i++){const finger=new THREE.Mesh(new THREE.CapsuleGeometry(.021,.075,4,7),gloveMat);finger.position.set(-.047+i*.031,-.018,-.105);finger.rotation.x=-.35;hand.add(finger);}const thumb=new THREE.Mesh(new THREE.CapsuleGeometry(.025,.075,4,7),gloveMat);thumb.position.set(.085,-.005,-.025);thumb.rotation.z=-.85;hand.add(thumb);return hand;}
+// Sleeves extend from both shoulders toward the weapon, with reinforced cuffs.
+limbBetween(operatorBody,[-.64,-.58,-.16],[-.22,-.42,-.76],.115,uniformMat);
+limbBetween(operatorBody,[.64,-.58,-.16],[.40,-.43,-.68],.12,uniformMat);
+limbBetween(operatorBody,[-.22,-.42,-.76],[-.15,-.405,-.88],.105,uniformDark);
+limbBetween(operatorBody,[.40,-.43,-.68],[.36,-.42,-.82],.105,uniformDark);
+const cuffGeo=new THREE.TorusGeometry(.104,.018,7,14);
+for(const p of [[-.15,-.405,-.88],[.36,-.42,-.82]]){const cuff=new THREE.Mesh(cuffGeo,seamMat);cuff.position.set(...p);cuff.rotation.x=Math.PI/2;operatorBody.add(cuff);}
+gloveHand(-.13,-.39,-.91,.92);gloveHand(.36,-.40,-.88,.88);
+// Subtle sleeve stitching and elbow reinforcement.
+for(const side of [-1,1]){const patch=new THREE.Mesh(new THREE.BoxGeometry(.12,.018,.16),seamMat);patch.position.set(side*.52,-.57,-.35);patch.rotation.z=side*.28;operatorBody.add(patch);}
+// Lower-body model is revealed only when the operator looks down.
+const operatorLegs=new THREE.Group();camera.add(operatorLegs);operatorLegs.visible=false;
+for(const side of [-1,1]){
+ const thigh=new THREE.Mesh(new THREE.CapsuleGeometry(.155,.52,6,10),uniformMat);thigh.position.set(side*.22,-1.08,-.24);thigh.rotation.x=-.28;operatorLegs.add(thigh);
+ const knee=new THREE.Mesh(new THREE.BoxGeometry(.27,.18,.12),uniformDark);knee.position.set(side*.22,-1.30,-.39);knee.rotation.x=-.25;operatorLegs.add(knee);
+ const kneePatch=new THREE.Mesh(new THREE.BoxGeometry(.18,.035,.025),seamMat);kneePatch.position.set(side*.22,-1.28,-.455);operatorLegs.add(kneePatch);
+ const shin=new THREE.Mesh(new THREE.CapsuleGeometry(.12,.32,5,9),uniformMat);shin.position.set(side*.22,-1.48,-.36);shin.rotation.x=-.2;operatorLegs.add(shin);
+ const boot=new THREE.Group();boot.position.set(side*.22,-1.68,-.55);operatorLegs.add(boot);
+ const upper=new THREE.Mesh(new THREE.BoxGeometry(.22,.19,.34),uniformDark);upper.position.set(0,.015,-.035);boot.add(upper);
+ const toe=new THREE.Mesh(new THREE.BoxGeometry(.225,.11,.22),gloveMat);toe.position.set(0,-.045,-.22);boot.add(toe);
+ const sole=new THREE.Mesh(new THREE.BoxGeometry(.235,.035,.48),new THREE.MeshStandardMaterial({color:0x101512,roughness:1}));sole.position.set(0,-.105,-.12);boot.add(sole);
+ const laceMat=new THREE.MeshStandardMaterial({color:0x9b9a7b,roughness:.9});for(let i=0;i<3;i++){const lace=new THREE.Mesh(new THREE.BoxGeometry(.12,.012,.018),laceMat);lace.position.set(0,.115-i*.035,-.12);boot.add(lace);}
+}
+
 const gunMat=mat(0x20292b,.34,.72), gunPolymer=mat(0x252d2b,.78,.05), gunAccent=mat(0x65734f,.52,.18);
 function gunBox(sx,sy,sz,x,y,z,material,bevel=.0){const g=new THREE.BoxGeometry(sx,sy,sz);const o=new THREE.Mesh(g,material);o.position.set(x,y,z);o.castShadow=true;weapon.add(o);return o;}
 function gunTube(radius,length,x,y,z,material,sides=12){const o=new THREE.Mesh(new THREE.CylinderGeometry(radius,radius,length,sides),material);o.rotation.x=Math.PI/2;o.position.set(x,y,z);o.castShadow=true;weapon.add(o);return o;}
@@ -547,7 +580,7 @@ function updateProjectiles(dt){
 }
 function reload(){if(!player.active||player.reloading)return;if(player.weaponType==='pistol'){if(player.pistolAmmo===12||player.pistolReserve<=0)return;player.reloading=true;playSound('reload');toast('SIDEARM RELOAD');setTimeout(()=>{const n=Math.min(12-player.pistolAmmo,player.pistolReserve);player.pistolAmmo+=n;player.pistolReserve-=n;player.reloading=false;updateHUD();},900);return;}if(player.weaponType==='launcher'){toast('AT-4 // DISPOSITIVO DE DISPARO ÚNICO');return;}if(player.ammo===30||player.reserve<=0){if(player.reserve<=0)setWeapon('pistol');return;}player.reloading=true;playSound('reload');toast('RELOADING');setTimeout(()=>{const n=Math.min(30-player.ammo,player.reserve);player.ammo+=n;player.reserve-=n;player.reloading=false;updateHUD();},1250);}
 function togglePause(){if(!player.active||!player.alive)return;if(pointerLocked){document.exitPointerLock();}else{canvas.requestPointerLock?.();}}
-function begin(){if(!window.__tacticalLicenseActive){document.getElementById('license-gate')?.classList.remove('hidden');return;}initAudio();startScreen.classList.add('hidden');player.active=true;spawnWave();if(!isTouchDevice)canvas.requestPointerLock?.();toast('OPERATION LIVE // GOOD HUNT');}
+function begin(){if(!window.__tacticalLicenseActive){window.openTacticalLicense?.();document.getElementById('license-gate')?.classList.remove('hidden');return;}initAudio();startScreen.classList.add('hidden');player.active=true;spawnWave();if(!isTouchDevice)canvas.requestPointerLock?.();toast('OPERATION LIVE // GOOD HUNT');}
 $('deploy-btn').addEventListener('click',begin);$('fullscreen-btn')?.addEventListener('click',async()=>{try{if(!document.fullscreenElement){await (document.documentElement.requestFullscreen?.()||document.documentElement.webkitRequestFullscreen?.());$('fullscreen-btn').textContent='⛶ SAIR DA TELA CHEIA';}else{await (document.exitFullscreen?.()||document.webkitExitFullscreen?.());$('fullscreen-btn').textContent='⛶ TELA CHEIA';}}catch{toast('TELA CHEIA NÃO SUPORTADA NESTE NAVEGADOR');}});document.addEventListener('fullscreenchange',()=>{$('fullscreen-btn').textContent=document.fullscreenElement?'⛶ SAIR DA TELA CHEIA':'⛶ TELA CHEIA';});$('resume-btn').addEventListener('click',()=>{if(!isTouchDevice)canvas.requestPointerLock?.();});
 $('next-round-btn').addEventListener('click',()=>{roundScreen.classList.add('hidden');player.round++;player.health=Math.min(100,player.health+18);player.ammo=30;player.reserve+=30;player.grenades=Math.min(5,player.grenades+1);player.active=true;spawnWave();updateHUD();if(!isTouchDevice)canvas.requestPointerLock?.();});
 $('retry-btn').addEventListener('click',()=>{gameoverScreen.classList.add('hidden');player.health=100;player.ammo=30;player.reserve=120;player.pistolAmmo=12;player.pistolReserve=48;player.rocketAmmo=0;setWeapon('rifle');player.grenades=3;player.kills=0;player.shots=0;player.hits=0;player.round=1;player.alive=true;player.active=true;camera.position.set(0,1.72,8);spawnWave();updateHUD();if(!isTouchDevice)canvas.requestPointerLock?.();});
@@ -671,7 +704,7 @@ function update(dt){
   if(keys.Space&&player.onGround){player.velocity.y=5.1;player.onGround=false;}player.velocity.y-=14*dt;
   if(player.onGround){camera.position.y=THREE.MathUtils.damp(camera.position.y,eyeHeight,18,dt);if(Math.abs(camera.position.y-eyeHeight)<.015)camera.position.y=eyeHeight;}
   else{camera.position.y+=player.velocity.y*dt;if(camera.position.y<=eyeHeight){camera.position.y=eyeHeight;player.velocity.y=0;player.onGround=true;}}
-  weapon.position.y=Math.sin(bob*1.7)*.012-recoil*.5+(crouched?-.22:0);weapon.position.x=Math.cos(bob*.85)*.008;weapon.rotation.x=-recoil+(crouched?.035:0);
+  weapon.position.y=Math.sin(bob*1.7)*.012-recoil*.5+(crouched?-.22:0);weapon.position.x=Math.cos(bob*.85)*.008;weapon.rotation.x=-recoil+(crouched?.035:0);operatorBody.position.y=(crouched?-.18:0)+Math.sin(bob*1.7)*.008;operatorLegs.visible=camera.rotation.x<-.32;operatorLegs.position.y=crouched?-.12:0;
   updateBots(dt);updateProjectiles(dt);for(const p of supplyPickups){p.phase+=dt*1.8;p.icon.position.y=p.baseY+Math.sin(p.phase)*.09;p.label.position.y=.72+Math.sin(p.phase)*.09;}collectSupplyPickups();updateMission(dt);updateCampaignRoute(dt);
   if(Math.floor(elapsed*3)%2===0)updateRadar();
  }

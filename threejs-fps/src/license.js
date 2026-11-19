@@ -14,4 +14,20 @@ $('whatsapp-proof').addEventListener('click',()=>{const email=$('license-email')
 $('check-license').addEventListener('click',refresh);
 $('license-logout').addEventListener('click',()=>{token='';localStorage.removeItem('tacticalStrikeToken');window.__tacticalLicenseActive=false;gate.classList.add('hidden');pay.classList.add('hidden');show('Você saiu da conta.');});
 $('license-back').addEventListener('click',()=>gate.classList.add('hidden'));
-refresh();
+async function validateAdminGameAccess(){
+ const adminGameToken=sessionStorage.getItem('tacticalStrikeAdminGameToken');
+ if(!adminGameToken)return;
+ try{
+  const response=await fetch(API+'/api/admin/game-access',{headers:{Authorization:'Bearer '+adminGameToken}});
+  if(!response.ok){sessionStorage.removeItem('tacticalStrikeAdminGameToken');return;}
+  const data=await response.json();
+  if(data.ok&&data.role==='admin'){
+   window.__tacticalLicenseActive=true;
+   gate.classList.add('hidden');
+   const launch=$('deploy-btn');
+   if(launch){launch.textContent='INICIAR OPERAÇÃO';}
+   show('Acesso administrativo liberado. Boa operação!');
+  }
+ }catch(error){console.warn('Não foi possível validar o acesso administrativo.',error);}
+}
+validateAdminGameAccess().then(refresh);

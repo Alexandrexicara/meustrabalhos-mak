@@ -1,1 +1,93 @@
-<!doctype html><html lang="pt-BR"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Tactical Strike Admin</title><link rel="stylesheet" href="/src/style.css"></head><body class="admin-page"><main class="admin-box"><h1>LIBERAR LICENÇA</h1><p>Confira o comprovante antes de liberar.</p><label>Chave administrativa<input id="admin-key" type="password"></label><label>E-mail cadastrado<input id="admin-email" type="email"></label><button id="unlock-player">LIBERAR ACESSO</button><p id="admin-result"></p></main><script type="module" src="/src/admin.js"></script></body></html>
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#080d12">
+  <title>Tactical Strike — Painel Administrativo</title>
+  <link rel="stylesheet" href="/src/style.css">
+  <style>
+    body.admin-page{height:auto;min-height:100%;overflow:auto;padding:24px;background:radial-gradient(ellipse at top,#17251d,#080d12 65%);color:#e8edf0}
+    .admin-shell{width:min(1120px,100%);margin:0 auto}
+    .admin-header{display:flex;align-items:center;justify-content:space-between;gap:16px;margin:10px 0 26px}
+    .admin-brand{font:900 clamp(28px,5vw,42px) 'Barlow Condensed',sans-serif;letter-spacing:2px;margin:0}
+    .admin-brand span{color:#c5f36b}
+    .admin-sub{color:#91a0a7;font-size:12px;line-height:1.6}
+    .admin-panel{background:rgba(11,19,23,.94);border:1px solid rgba(197,243,107,.2);padding:clamp(16px,3vw,26px);box-shadow:0 18px 55px #0008}
+    .admin-login{max-width:440px;margin:8vh auto}
+    .admin-panel h2{font:800 25px 'Barlow Condensed',sans-serif;letter-spacing:1px;margin:0 0 8px}
+    .admin-panel label{display:block;color:#aab7be;font-size:12px;margin:18px 0 7px}
+    .admin-panel input{width:100%;padding:14px;background:#080d12;border:1px solid #405047;color:#fff;border-radius:4px;font:14px 'IBM Plex Mono',monospace}
+    .admin-btn{border:0;border-radius:4px;padding:12px 15px;font:700 11px 'IBM Plex Mono',monospace;letter-spacing:.5px;cursor:pointer}
+    .admin-primary{background:#c5f36b;color:#11190b}
+    .admin-secondary{background:#26343a;color:#e8edf0;border:1px solid #52616a}
+    .admin-danger{background:#572b29;color:#ffd9d5;border:1px solid #a64d45}
+    .admin-btn:disabled{opacity:.5;cursor:wait}
+    .admin-message{min-height:22px;color:#c5f36b;font-size:12px;margin:12px 0 0}
+    .admin-toolbar{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin:18px 0}
+    .admin-stats{display:flex;gap:10px;flex-wrap:wrap}
+    .admin-stat{background:#111c20;border:1px solid #293a36;padding:12px 16px;min-width:120px}
+    .admin-stat b{display:block;color:#c5f36b;font-size:22px}
+    .admin-stat span{font-size:10px;color:#91a0a7}
+    .admin-table-wrap{overflow-x:auto;border:1px solid #293a36}
+    .admin-table{width:100%;border-collapse:collapse;min-width:760px;font-size:12px}
+    .admin-table th,.admin-table td{text-align:left;padding:13px 12px;border-bottom:1px solid #26343a;vertical-align:middle}
+    .admin-table th{color:#c5f36b;background:#111c20;font-size:10px;letter-spacing:1px}
+    .admin-table td{color:#dce5e6}
+    .admin-actions{display:flex;gap:7px;flex-wrap:wrap}
+    .admin-actions .admin-btn{padding:9px 10px;font-size:10px}
+    .admin-status{display:inline-block;padding:5px 8px;border-radius:3px;background:#26343a;color:#dce5e6;font-size:10px}
+    .admin-status.ok{background:#203b28;color:#c5f36b}
+    .admin-status.wait{background:#473b22;color:#ffd58a}
+    .admin-status.no{background:#482725;color:#ffaaa2}
+    .admin-empty{text-align:center;color:#91a0a7;padding:30px}
+    @media(max-width:600px){body.admin-page{padding:14px}.admin-header{align-items:flex-start;flex-direction:column}.admin-login{margin:5vh auto}.admin-toolbar{align-items:stretch}.admin-toolbar>button{width:100%}}
+  </style>
+</head>
+<body class="admin-page">
+  <main class="admin-shell">
+    <section id="admin-login" class="admin-panel admin-login">
+      <p class="eyebrow">TACTICAL STRIKE / CONTROLE DO SISTEMA</p>
+      <h1 class="admin-brand">PAINEL <span>ADMIN</span></h1>
+      <p class="admin-sub">Entre com a senha administrativa para consultar cadastros e aprovar pagamentos.</p>
+      <form id="admin-login-form">
+        <label for="admin-password">Senha administrativa</label>
+        <input id="admin-password" type="password" autocomplete="current-password" required>
+        <button class="admin-btn admin-primary" style="width:100%;margin-top:16px" type="submit">ENTRAR NO PAINEL</button>
+      </form>
+      <p id="admin-login-message" class="admin-message" role="status"></p>
+    </section>
+
+    <section id="admin-dashboard" class="hidden">
+      <header class="admin-header">
+        <div>
+          <p class="eyebrow">TACTICAL STRIKE / CENTRAL DE OPERAÇÕES</p>
+          <h1 class="admin-brand">PAINEL <span>ADMIN</span></h1>
+          <p class="admin-sub">Gerencie jogadores, pagamentos e licenças em um só lugar.</p>
+        </div>
+        <button id="admin-logout" class="admin-btn admin-secondary">SAIR DO PAINEL</button>
+      </header>
+      <div class="admin-toolbar">
+        <div class="admin-stats">
+          <div class="admin-stat"><b id="stat-total">0</b><span>CADASTROS</span></div>
+          <div class="admin-stat"><b id="stat-pending">0</b><span>AGUARDANDO</span></div>
+          <div class="admin-stat"><b id="stat-active">0</b><span>LICENÇAS ATIVAS</span></div>
+        </div>
+        <button id="admin-refresh" class="admin-btn admin-secondary">ATUALIZAR LISTA</button>
+      </div>
+      <div class="admin-panel">
+        <h2>JOGADORES CADASTRADOS</h2>
+        <p class="admin-sub">Confira o pagamento e aprove ou recuse. Também é possível ativar ou desativar uma licença manualmente.</p>
+        <p id="admin-dashboard-message" class="admin-message" role="status"></p>
+        <div class="admin-table-wrap">
+          <table class="admin-table">
+            <thead><tr><th>JOGADOR / E-MAIL</th><th>CADASTRO</th><th>PAGAMENTO</th><th>LICENÇA</th><th>AÇÕES</th></tr></thead>
+            <tbody id="admin-players"><tr><td colspan="5" class="admin-empty">Carregando cadastros...</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+  </main>
+  <script type="module" src="/src/admin.js"></script>
+</body>
+</html>

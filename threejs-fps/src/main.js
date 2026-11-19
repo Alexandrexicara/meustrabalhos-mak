@@ -10,6 +10,7 @@ scene.fog = new THREE.Fog(0x89999a, 22, 78);
 const camera = new THREE.PerspectiveCamera(76, innerWidth / innerHeight, 0.1, 120);
 camera.position.set(0, 1.72, 8);
 let renderer = null;
+const lowPowerDevice = window.matchMedia('(pointer: coarse)').matches || (navigator.hardwareConcurrency || 4) <= 4;
 try {
  renderer = new THREE.WebGLRenderer({ canvas, antialias: false, alpha: false, powerPreference: 'low-power', failIfMajorPerformanceCaveat: false });
 } catch (error) {
@@ -22,11 +23,11 @@ try {
  document.body.appendChild(fallback);
 }
 if (renderer) {
- renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.15));
+ renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, lowPowerDevice ? 0.9 : 1.15));
  renderer.setSize(innerWidth, innerHeight, false);
  renderer.domElement.style.width = '100%';
  renderer.domElement.style.height = '100%';
-renderer.shadowMap.enabled = true;
+renderer.shadowMap.enabled = !lowPowerDevice;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
@@ -34,7 +35,7 @@ renderer.toneMappingExposure = 1.12;
 
 scene.add(new THREE.HemisphereLight(0xc9e2e4, 0x303a35, 2.0));
 const sun = new THREE.DirectionalLight(0xffe4bd, 2.8);
-sun.position.set(-12, 24, 10); sun.castShadow = true;
+sun.position.set(-12, 24, 10); sun.castShadow = !lowPowerDevice;
 sun.shadow.mapSize.set(1024, 1024);
 sun.shadow.camera.left = -36; sun.shadow.camera.right = 36;
 sun.shadow.camera.top = 36; sun.shadow.camera.bottom = -36;
@@ -183,13 +184,13 @@ const seamMat=new THREE.MeshStandardMaterial({color:0x697454,roughness:.9});
 function limbBetween(parent,a,b,radius,material){const av=new THREE.Vector3(...a),bv=new THREE.Vector3(...b),d=bv.clone().sub(av);const mesh=new THREE.Mesh(new THREE.CapsuleGeometry(radius,Math.max(.06,d.length()-radius*2),6,10),material);mesh.position.copy(av.add(bv).multiplyScalar(.5));mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0),d.normalize());mesh.castShadow=true;parent.add(mesh);return mesh;}
 function gloveHand(parent,x,y,z,scale=1){const hand=new THREE.Group();hand.position.set(x,y,z);hand.scale.setScalar(scale);parent.add(hand);const palm=new THREE.Mesh(new THREE.BoxGeometry(.14,.105,.19),gloveMat);palm.rotation.x=-.18;hand.add(palm);for(let i=0;i<4;i++){const finger=new THREE.Mesh(new THREE.CapsuleGeometry(.021,.075,4,7),gloveMat);finger.position.set(-.047+i*.031,-.018,-.105);finger.rotation.x=-.35;hand.add(finger);}const thumb=new THREE.Mesh(new THREE.CapsuleGeometry(.025,.075,4,7),gloveMat);thumb.position.set(.085,-.005,-.025);thumb.rotation.z=-.85;hand.add(thumb);return hand;}
 const rightArmRig=new THREE.Group();rightArmRig.position.set(.64,-.58,-.16);operatorBody.add(rightArmRig);
-limbBetween(rightArmRig,[0,0,0],[-.24,.16,-.52],.12,uniformMat);
-limbBetween(rightArmRig,[-.24,.16,-.52],[-.28,.16,-.68],.105,uniformDark);
+limbBetween(rightArmRig,[0,0,0],[-.24,.16,-.52],.145,uniformMat);
+limbBetween(rightArmRig,[-.24,.16,-.52],[-.28,.16,-.68],.125,uniformDark);
 const rightCuff=new THREE.Mesh(new THREE.TorusGeometry(.104,.018,7,14),seamMat);rightCuff.position.set(-.28,.16,-.68);rightCuff.rotation.x=Math.PI/2;rightArmRig.add(rightCuff);
 gloveHand(rightArmRig,-.28,.18,-.74,.88);
 const leftArmRig=new THREE.Group();leftArmRig.position.set(-.64,-.58,-.16);operatorBody.add(leftArmRig);
-limbBetween(leftArmRig,[0,0,0],[.40,.16,-.50],.115,uniformMat);
-limbBetween(leftArmRig,[.40,.16,-.50],[.88,.18,-.72],.105,uniformDark);
+limbBetween(leftArmRig,[0,0,0],[.40,.16,-.50],.14,uniformMat);
+limbBetween(leftArmRig,[.40,.16,-.50],[.88,.18,-.72],.125,uniformDark);
 const leftCuff=new THREE.Mesh(new THREE.TorusGeometry(.104,.018,7,14),seamMat);leftCuff.position.set(.88,.18,-.72);leftCuff.rotation.x=Math.PI/2;leftArmRig.add(leftCuff);
 const leftHand=gloveHand(leftArmRig,.88,.20,-.78,.92);
 // Reinforced shoulder/elbow stitching remains visible while the arms animate.
@@ -200,11 +201,11 @@ grenadeInHand.position.set(0,-.015,-.18);grenadeInHand.visible=false;leftHand.ad
 // Lower-body model is revealed only when the operator looks down.
 const operatorLegs=new THREE.Group();camera.add(operatorLegs);operatorLegs.visible=false;
 for(const side of [-1,1]){
- const thigh=new THREE.Mesh(new THREE.CapsuleGeometry(.155,.52,6,10),uniformMat);thigh.position.set(side*.22,-1.08,-.24);thigh.rotation.x=-.28;operatorLegs.add(thigh);
- const knee=new THREE.Mesh(new THREE.BoxGeometry(.27,.18,.12),uniformDark);knee.position.set(side*.22,-1.30,-.39);knee.rotation.x=-.25;operatorLegs.add(knee);
- const kneePatch=new THREE.Mesh(new THREE.BoxGeometry(.18,.035,.025),seamMat);kneePatch.position.set(side*.22,-1.28,-.455);operatorLegs.add(kneePatch);
- const shin=new THREE.Mesh(new THREE.CapsuleGeometry(.12,.32,5,9),uniformMat);shin.position.set(side*.22,-1.48,-.36);shin.rotation.x=-.2;operatorLegs.add(shin);
- const boot=new THREE.Group();boot.position.set(side*.22,-1.68,-.55);operatorLegs.add(boot);
+ const thigh=new THREE.Mesh(new THREE.CapsuleGeometry(.155,.52,6,10),uniformMat);thigh.position.set(side*.22,-1.08,-.62);thigh.rotation.x=-.28;operatorLegs.add(thigh);
+ const knee=new THREE.Mesh(new THREE.BoxGeometry(.27,.18,.12),uniformDark);knee.position.set(side*.22,-1.30,-.82);knee.rotation.x=-.25;operatorLegs.add(knee);
+ const kneePatch=new THREE.Mesh(new THREE.BoxGeometry(.18,.035,.025),seamMat);kneePatch.position.set(side*.22,-1.28,-.885);operatorLegs.add(kneePatch);
+ const shin=new THREE.Mesh(new THREE.CapsuleGeometry(.12,.32,5,9),uniformMat);shin.position.set(side*.22,-1.48,-.96);shin.rotation.x=-.2;operatorLegs.add(shin);
+ const boot=new THREE.Group();boot.position.set(side*.22,-1.68,-1.18);operatorLegs.add(boot);
  const upper=new THREE.Mesh(new THREE.BoxGeometry(.22,.19,.34),uniformDark);upper.position.set(0,.015,-.035);boot.add(upper);
  const toe=new THREE.Mesh(new THREE.BoxGeometry(.225,.11,.22),gloveMat);toe.position.set(0,-.045,-.22);boot.add(toe);
  const sole=new THREE.Mesh(new THREE.BoxGeometry(.235,.035,.48),new THREE.MeshStandardMaterial({color:0x101512,roughness:1}));sole.position.set(0,-.105,-.12);boot.add(sole);
@@ -640,7 +641,7 @@ if(isTouchDevice){
 }
 document.addEventListener('contextmenu',e=>{if(isTouchDevice)e.preventDefault();});
 document.addEventListener('mousedown',e=>{if(e.button===0)shoot();if(e.button===2){e.preventDefault();throwGrenade();}});canvas.addEventListener('contextmenu',e=>e.preventDefault());document.addEventListener('keydown',e=>{keys[e.code]=true;if(e.code==='KeyR')reload();if(e.code==='Digit1')setWeapon('rifle');if(e.code==='Digit2')setWeapon('pistol');if(e.code==='Digit3'&&player.rocketAmmo>0)setWeapon('launcher');if(e.code==='KeyG')throwGrenade();if(e.code==='Escape'&&pointerLocked){};});document.addEventListener('keyup',e=>keys[e.code]=false);
-window.addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();const ratio=Math.min(window.devicePixelRatio||1,1.15);renderer.setPixelRatio(ratio);renderer.setSize(innerWidth,innerHeight,false);});
+window.addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();const ratio=Math.min(window.devicePixelRatio||1,lowPowerDevice?.9:1.15);renderer.setPixelRatio(ratio);renderer.setSize(innerWidth,innerHeight,false);});
 let contextLost=false;
 canvas.addEventListener('webglcontextlost',event=>{event.preventDefault();contextLost=true;player.active=false;pauseScreen.classList.add('hidden');toast('GRAPHICS PAUSED // RESTORING WEBGL');});
 canvas.addEventListener('webglcontextrestored',()=>{contextLost=false;renderer.setPixelRatio(Math.min(window.devicePixelRatio||1,1.15));renderer.setSize(innerWidth,innerHeight,false);toast('GRAPHICS RESTORED // CLICK DEPLOY TO RESUME');});
@@ -734,12 +735,12 @@ function update(dt){
   if(keys.Space&&player.onGround){player.velocity.y=5.1;player.onGround=false;}player.velocity.y-=14*dt;
   if(player.onGround){camera.position.y=THREE.MathUtils.damp(camera.position.y,eyeHeight,18,dt);if(Math.abs(camera.position.y-eyeHeight)<.015)camera.position.y=eyeHeight;}
   else{camera.position.y+=player.velocity.y*dt;if(camera.position.y<=eyeHeight){camera.position.y=eyeHeight;player.velocity.y=0;player.onGround=true;}}
-  weapon.position.y=Math.sin(bob*1.7)*.012-recoil*.5+(crouched?-.22:0);weapon.position.x=Math.cos(bob*.85)*.008;weapon.rotation.x=-recoil+(crouched?.035:0);operatorLegs.visible=camera.rotation.x<-.20;operatorLegs.position.y=crouched?-.12:0;updateFirstPersonRig(dt,crouched);
+  weapon.position.y=Math.sin(bob*1.7)*.012-recoil*.5+(crouched?-.22:0);weapon.position.x=Math.cos(bob*.85)*.008;weapon.rotation.x=-recoil+(crouched?.035:0);operatorLegs.visible=camera.rotation.x<-.10;operatorLegs.position.y=crouched?-.12:0;updateFirstPersonRig(dt,crouched);
   updateBots(dt);updateProjectiles(dt);for(const p of supplyPickups){p.phase+=dt*1.8;p.icon.position.y=p.baseY+Math.sin(p.phase)*.09;p.label.position.y=.72+Math.sin(p.phase)*.09;}collectSupplyPickups();updateMission(dt);updateCampaignRoute(dt);
   if(Math.floor(elapsed*3)%2===0)updateRadar();
  }
  $('clock').textContent=String(Math.floor(elapsed/60)).padStart(2,'0')+':'+String(Math.floor(elapsed%60)).padStart(2,'0');
 }
-function animate(){requestAnimationFrame(animate);if(contextLost)return;const dt=Math.min(clock.getDelta(),.04);update(dt);try{renderer.render(scene,camera);}catch(error){console.error('Render failed:',error);}}
+function animate(){requestAnimationFrame(animate);if(contextLost)return;const dt=Math.min(clock.getDelta(),.15);update(dt);try{renderer.render(scene,camera);}catch(error){console.error('Render failed:',error);}}
 spawnWave();updateHUD();animate();
 }

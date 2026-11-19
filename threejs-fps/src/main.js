@@ -116,7 +116,6 @@ const mapThemes=[
 ];
 let currentMap=-1;
 function buildMap(round){
- helicopterDestroyed=false;patrolAircraft.visible=true;
  const idx=(round-1)%mapThemes.length,theme=mapThemes[idx];currentMap=idx;
  world.clear();
  colliders.length=0;destructibleCrates.length=0;crateDebris.length=0;combatVehicles.length=0;
@@ -161,7 +160,7 @@ function buildMap(round){
  box(roofX,roofTop-.18,roofZ,roofW,.36,roofD,wall,true);
  box(roofX,roofTop+.08,roofZ,roofW+.25,.16,roofD+.25,trim,false);
  for(const side of [-1,1]){box(roofX+side*(roofW/2-.12),roofTop+.48,roofZ,.18,.8,roofD,trim,false);}
- const ladderMat=mat(0x344348,.38,.72),ladderX=roofW/2-.38,ladderZ=roofZ;
+ const ladderMat=mat(0x344348,.38,.72),ladderX=roofW/2+.45,ladderZ=roofZ;
  for(const side of [-1,1]){const rail=new THREE.Mesh(new THREE.CylinderGeometry(.075,.075,roofTop+.5,10),ladderMat);rail.position.set(ladderX+side*.48,(roofTop+.5)/2,ladderZ);rail.castShadow=true;world.add(rail);}
  for(let rung=.28;rung<roofTop-.05;rung+=.38){const rungMesh=new THREE.Mesh(new THREE.CylinderGeometry(.045,.045,.96,10),ladderMat);rungMesh.rotation.z=Math.PI/2;rungMesh.position.set(ladderX,rung,ladderZ);rungMesh.castShadow=true;world.add(rungMesh);}
  const ladderSign=new THREE.Mesh(new THREE.BoxGeometry(1.35,.42,.08),mat(0x172326));ladderSign.position.set(ladderX,1.25,ladderZ-.56);world.add(ladderSign);
@@ -311,7 +310,7 @@ const isTouchDevice=window.matchMedia('(pointer: coarse)').matches||navigator.ma
 let mobileFiring=false;
 const $=id=>document.getElementById(id);
 const startScreen=$('start-screen'),pauseScreen=$('pause-screen'),roundScreen=$('round-screen'),gameoverScreen=$('gameover-screen');
-const mapBounds=36;const supplyPickups=[];const roofTopHeight=4.6;let onRooftop=false;const ladderPosition={x:6.12,z:-17};
+const mapBounds=36;const supplyPickups=[];const roofTopHeight=4.6;let onRooftop=false;const ladderPosition={x:6.95,z:-17};
 function rand(min,max){return min+Math.random()*(max-min)}
 function toast(message){$('toast').textContent=message;$('toast').classList.add('show');clearTimeout(toastTimeout);toastTimeout=setTimeout(()=>$('toast').classList.remove('show'),1700)}
 let audioCtx=null,masterGain=null,ambientStarted=false,lastStepSound=0;
@@ -444,7 +443,7 @@ function makeBot(index){
  if(soldierTemplate)attachSoldier(bot);return bot;
 }
 function spawnWave(){
- routeActive=false;if(routeMarker){world.remove(routeMarker);routeMarker=null;}buildMap(player.round);spawnSupplyPickups();for(const b of bots)scene.remove(b.group);bots.length=0;
+ helicopterDestroyed=false;patrolAircraft.visible=true;routeActive=false;if(routeMarker){world.remove(routeMarker);routeMarker=null;}buildMap(player.round);spawnSupplyPickups();for(const b of bots)scene.remove(b.group);bots.length=0;
  const count=Math.min(18+(player.round-1)*4,40);for(let i=0;i<count;i++){const bot=makeBot(i);if(i<4){const roofSpots=[[-4.2,-19.2],[4.2,-19.2],[-2.7,-13.8],[2.7,-13.8]];bot.group.position.set(roofSpots[i][0],roofTopHeight,roofSpots[i][1]);}}
  $('wave').textContent=String(count).padStart(2,'0');$('radar-count').textContent=String(count).padStart(2,'0');
  $('round-label').textContent='ROUND '+String(player.round).padStart(2,'0');
@@ -757,7 +756,7 @@ function update(dt){
   const move=new THREE.Vector3();if(keys.KeyW)move.add(forward);if(keys.KeyS)move.sub(forward);if(keys.KeyD)move.add(right);if(keys.KeyA)move.sub(right);
   if(move.lengthSq()>0){if(elapsed-lastStepSound>.38){playSound('step');lastStepSound=elapsed;}move.normalize();const speed=(keys.ShiftLeft||keys.ShiftRight)?8.5:5.2;const nx=camera.position.x+move.x*speed*dt,nz=camera.position.z+move.z*speed*dt;if(!moveBlocked(nx,camera.position.z))camera.position.x=nx;if(!moveBlocked(camera.position.x,nz))camera.position.z=nz;bob+=dt*speed;}
   const crouched=!!(keys.KeyC||keys.ControlLeft||keys.ControlRight),eyeHeight=onRooftop?roofTopHeight+1.72:(crouched?1.12:1.72);
-  if((keys.KeyE||keys.Space)&&player.onGround&&!onRooftop&&Math.hypot(camera.position.x-ladderPosition.x,camera.position.z-ladderPosition.z)<1.55){onRooftop=true;camera.position.set(ladderPosition.x,roofTopHeight+1.72,ladderPosition.z+1.05);player.velocity.y=0;keys.KeyE=false;keys.Space=false;toast('LAJE ALCANÇADA // ELIMINE OS HOSTIS E PEGUE O AT-4');}else if(keys.KeyE&&onRooftop&&Math.hypot(camera.position.x-ladderPosition.x,camera.position.z-ladderPosition.z)<1.8){onRooftop=false;camera.position.y=1.72;keys.KeyE=false;toast('DESCENDO PELA ESCADA');}if(keys.Space&&player.onGround&&!onRooftop){player.velocity.y=5.1;player.onGround=false;}player.velocity.y-=14*dt;
+  if((keys.KeyE||keys.Space)&&player.onGround&&!onRooftop&&Math.hypot(camera.position.x-ladderPosition.x,camera.position.z-ladderPosition.z)<1.55){onRooftop=true;camera.position.set(ladderPosition.x,roofTopHeight+1.72,ladderPosition.z+1.05);player.velocity.y=0;keys.KeyE=false;keys.Space=false;toast('LAJE ALCANÇADA // ELIMINE OS HOSTIS E PEGUE O AT-4');}else if(keys.KeyE&&onRooftop&&Math.hypot(camera.position.x-ladderPosition.x,camera.position.z-ladderPosition.z)<1.8){onRooftop=false;camera.position.set(ladderPosition.x+.35,1.72,ladderPosition.z+1.05);keys.KeyE=false;toast('DESCENDO PELA ESCADA');}if(keys.Space&&player.onGround&&!onRooftop){player.velocity.y=5.1;player.onGround=false;}player.velocity.y-=14*dt;
   if(player.onGround){camera.position.y=THREE.MathUtils.damp(camera.position.y,eyeHeight,18,dt);if(Math.abs(camera.position.y-eyeHeight)<.015)camera.position.y=eyeHeight;}
   else{camera.position.y+=player.velocity.y*dt;if(camera.position.y<=eyeHeight){camera.position.y=eyeHeight;player.velocity.y=0;player.onGround=true;}}
   weapon.position.y=Math.sin(bob*1.7)*.012-recoil*.5+(crouched?-.22:0);weapon.position.x=Math.cos(bob*.85)*.008;weapon.rotation.x=-recoil+(crouched?.035:0);operatorLegs.visible=camera.rotation.x<-.10;operatorLegs.position.y=crouched?-.12:0;updateFirstPersonRig(dt,crouched);

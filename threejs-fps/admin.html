@@ -49,8 +49,10 @@
     <section id="admin-login" class="admin-panel admin-login">
       <p class="eyebrow">TACTICAL STRIKE / CONTROLE DO SISTEMA</p>
       <h1 class="admin-brand">PAINEL <span>ADMIN</span></h1>
-      <p class="admin-sub">Entre com a senha administrativa para consultar cadastros e aprovar pagamentos.</p>
+      <p class="admin-sub">Entre com seu e-mail e senha de administrador para consultar cadastros e aprovar pagamentos.</p>
       <form id="admin-login-form">
+        <label for="admin-email">E-mail administrativo</label>
+        <input id="admin-email" type="email" autocomplete="username" required>
         <label for="admin-password">Senha administrativa</label>
         <input id="admin-password" type="password" autocomplete="current-password" required>
         <button class="admin-btn admin-primary" style="width:100%;margin-top:16px" type="submit">ENTRAR NO PAINEL</button>

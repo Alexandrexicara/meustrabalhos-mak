@@ -77,6 +77,23 @@ app.post('/api/payment/request', auth, wrap(async (req, res) => {
   res.json({ ok: true, amountCents: 1000 });
 }));
 
+function adminGameAuth(req, res, next) {
+  try {
+    const token = (req.headers.authorization || '').replace(/^Bearer\\s+/i, '');
+    const user = jwt.verify(token, JWT);
+    if (user.role !== 'admin_game' || user.email !== ADMIN_EMAIL) return res.status(403).json({ error: 'Acesso administrativo ao jogo não autorizado.' });
+    req.admin = user;
+    next();
+  } catch { res.status(401).json({ error: 'Acesso administrativo ao jogo expirado. Volte ao painel.' }); }
+}
+
+app.post('/api/admin/game-access', adminAuth, (req, res) => {
+  const token = jwt.sign({ email: req.admin.email, role: 'admin_game' }, JWT, { expiresIn: '4h' });
+  res.json({ token, expiresIn: '4h' });
+});
+
+app.get('/api/admin/game-access', adminGameAuth, (_req, res) => res.json({ ok: true, role: 'admin' }));
+
 app.post('/api/admin/login', (req, res) => {
   const email = String(req.body.email || '').trim().toLowerCase();
   const password = String(req.body.password || '');

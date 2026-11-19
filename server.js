@@ -8,29 +8,30 @@ const app = express();
 const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL, ssl: { rejectUnauthorized: false } });
 const JWT = process.env.JWT_SECRET;
 const ADMIN = process.env.ADMIN_KEY;
+const ADMIN_EMAIL = String(process.env.ADMIN_EMAIL || '').trim().toLowerCase();
 const PORT = process.env.PORT || 10000;
 
-if (!process.env.DATABASE_URL || !JWT || !ADMIN) throw Error('Missing DATABASE_URL/JWT_SECRET/ADMIN_KEY');
+if (!process.env.DATABASE_URL || !JWT || !ADMIN || !ADMIN_EMAIL) throw Error('Missing DATABASE_URL/JWT_SECRET/ADMIN_KEY/ADMIN_EMAIL');
 
 app.use(cors({ origin: ['https://tactical-fpsmake.netlify.app'], allowedHeaders: ['Content-Type', 'Authorization', 'X-Admin-Key'] }));
 app.use(express.json({ limit: '32kb' }));
 
 const wrap = fn => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
 const signPlayer = player => jwt.sign({ id: player.id, email: player.email, role: 'player' }, JWT, { expiresIn: '30d' });
-const signAdmin = () => jwt.sign({ role: 'admin' }, JWT, { expiresIn: '12h' });
+const signAdmin = email => jwt.sign({ email, role: 'admin' }, JWT, { expiresIn: '12h' });
 
 function auth(req, res, next) {
   try {
-    req.user = jwt.verify((req.headers.authorization || '').replace(/^Bearer\s+/i, ''), JWT);
+    req.user = jwt.verify((req.headers.authorization || '').replace(/^Bearer\\s+/i, ''), JWT);
     if (req.user.role !== 'player') return res.status(403).json({ error: 'Acesso de jogador não autorizado.' });
     next();
   } catch { res.status(401).json({ error: 'Faça login novamente.' }); }
 }
 function adminAuth(req, res, next) {
   try {
-    const token = (req.headers.authorization || '').replace(/^Bearer\s+/i, '');
+    const token = (req.headers.authorization || '').replace(/^Bearer\\s+/i, '');
     const user = jwt.verify(token, JWT);
-    if (user.role !== 'admin') return res.status(403).json({ error: 'Acesso administrativo necessário.' });
+    if (user.role !== 'admin' || user.email !== ADMIN_EMAIL) return res.status(403).json({ error: 'Acesso administrativo necessário.' });
     req.admin = user;
     next();
   } catch { res.status(401).json({ error: 'Sessão administrativa expirada. Entre novamente.' }); }
@@ -47,7 +48,7 @@ app.get('/api/config', (_req, res) => res.json({ priceCents: 1000, pixKey: 'sant
 app.post('/api/auth/register', wrap(async (req, res) => {
   const email = String(req.body.email || '').trim().toLowerCase();
   const pass = String(req.body.password || '');
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || pass.length < 8) return res.status(400).json({ error: 'E-mail válido e senha com mínimo de 8 caracteres.' });
+  if (!/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email) || pass.length < 8) return res.status(400).json({ error: 'E-mail válido e senha com mínimo de 8 caracteres.' });
   try {
     const result = await pool.query('INSERT INTO players(email,password_hash) VALUES($1,$2) RETURNING id,email,license_active', [email, await bcrypt.hash(pass, 12)]);
     res.status(201).json({ token: signPlayer(result.rows[0]), player: { email, licenseActive: false } });
@@ -76,10 +77,11 @@ app.post('/api/payment/request', auth, wrap(async (req, res) => {
   res.json({ ok: true, amountCents: 1000 });
 }));
 
-// Admin login: the password is the ADMIN_KEY environment variable stored only on Render.
 app.post('/api/admin/login', (req, res) => {
-  if (String(req.body.password || '') !== ADMIN) return res.status(401).json({ error: 'Senha administrativa incorreta.' });
-  res.json({ token: signAdmin(), expiresIn: '12h' });
+  const email = String(req.body.email || '').trim().toLowerCase();
+  const password = String(req.body.password || '');
+  if (email !== ADMIN_EMAIL || password !== ADMIN) return res.status(401).json({ error: 'E-mail ou senha administrativa incorretos.' });
+  res.json({ token: signAdmin(email), expiresIn: '12h' });
 });
 
 app.get('/api/admin/players', adminAuth, wrap(async (_req, res) => {

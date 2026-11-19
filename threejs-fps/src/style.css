@@ -49,10 +49,10 @@
 @media(max-width:760px){.start-screen{background:linear-gradient(90deg,rgba(4,9,13,.93),rgba(4,9,13,.76)),linear-gradient(0deg,rgba(4,9,13,.4),transparent)}.start-hero-art{right:-20%;top:4%;width:100%;height:68%;opacity:.48}.start-content{margin:0 auto;width:88vw;padding:20px 0}.start-title{font-size:clamp(64px,17vw,86px);margin:18px 0}.start-content p{font-size:9px}.game-price{margin-top:15px;padding:10px 13px;width:250px}.game-price strong{font-size:32px}.start-content button{min-width:250px;margin-top:14px}}
 
 
-/* Fundo fotográfico real da tela inicial Tactical Strike */
+/* Enquadramento corrigido: usa a mesma imagem sem zoom/corte excessivo */
 .start-screen{isolation:isolate;background:#080d12}
-.start-hero-art{position:absolute;inset:0;top:0;right:0;width:100%;height:100%;display:block;opacity:1;filter:none;z-index:0;background-image:url('/assets/images/tactical-soldier-bg.jpg');background-position:center 42%;background-size:cover;background-repeat:no-repeat;pointer-events:none}
-.start-hero-art::after{content:'';position:absolute;inset:0;background:linear-gradient(90deg,rgba(4,9,13,.96) 0%,rgba(4,9,13,.88) 31%,rgba(4,9,13,.48) 58%,rgba(4,9,13,.12) 100%),linear-gradient(0deg,rgba(4,9,13,.42),transparent 38%,rgba(4,9,13,.18))}
+.start-hero-art{position:absolute;inset:0;width:100%;height:100%;display:block;opacity:1;filter:none;z-index:0;background-image:url('/assets/images/tactical-soldier-bg.jpg');background-position:right center;background-size:auto 78%;background-repeat:no-repeat;pointer-events:none}
+.start-hero-art::after{content:'';position:absolute;inset:0;background:linear-gradient(90deg,rgba(4,9,13,.96) 0%,rgba(4,9,13,.88) 31%,rgba(4,9,13,.48) 58%,rgba(4,9,13,.12) 100%),linear-gradient(0deg,rgba(4,9,13,.25),transparent 38%,rgba(4,9,13,.10))}
 .start-grid{z-index:1;opacity:.1}
 .start-content{z-index:2;position:relative}
-@media(max-width:760px){.start-hero-art{background-position:62% center;opacity:1}.start-hero-art::after{background:linear-gradient(90deg,rgba(4,9,13,.88),rgba(4,9,13,.55) 58%,rgba(4,9,13,.25)),linear-gradient(0deg,rgba(4,9,13,.75),transparent 65%)}.start-content{z-index:2}}
+@media(max-width:760px){.start-hero-art{background-position:right center;background-size:auto 58%;opacity:1}.start-hero-art::after{background:linear-gradient(90deg,rgba(4,9,13,.88),rgba(4,9,13,.55) 58%,rgba(4,9,13,.25)),linear-gradient(0deg,rgba(4,9,13,.60),transparent 65%)}.start-content{z-index:2}}

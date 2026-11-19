@@ -116,7 +116,9 @@ const mapThemes=[
 ];
 let currentMap=-1;
 function buildMap(round){
- const idx=(round-1)%mapThemes.length,theme=mapThemes[idx];currentMap=idx;
+ const requestedPhase=Number(new URLSearchParams(location.search).get('phase'));
+ const previewPhase=Number.isInteger(requestedPhase)&&requestedPhase>=1&&requestedPhase<=mapThemes.length?requestedPhase-1:-1;
+ const idx=previewPhase>=0?previewPhase:(round-1)%mapThemes.length,theme=mapThemes[idx];currentMap=idx;
  world.clear();
  colliders.length=0;destructibleCrates.length=0;crateDebris.length=0;combatVehicles.length=0;
  scene.background=new THREE.Color(theme.sky);scene.fog=new THREE.Fog(theme.fog,34,132);
@@ -150,6 +152,34 @@ function buildMap(round){
  }else if(idx===4){building(0,-18,31,3,8,wall);building(-16,0,3,38,8,wall);building(16,0,3,38,8,wall);box(0,8,0,34,1.1,42,steel);for(let z=-18;z<=18;z+=9)box(0,7.2,z,33,.35,.35,trim);building(-8,-12,9,8,4.2,darkConcrete);building(9,12,10,8,4.5,wall);for(let x of [-10,-4,4,10])addCrate(x,-2,1.5);
  }else if(idx===5){for(let i=0;i<95;i++){const x=rand(-34,34),z=rand(-34,34);if(Math.hypot(x,z-8)<7)continue;const t=new THREE.Mesh(new THREE.CylinderGeometry(.22,.38,7,7),mat(0x44382b));t.position.set(x,2.5,z);world.add(t);const c=new THREE.Mesh(new THREE.ConeGeometry(2.4,5,7),mat(0x304b32));c.position.set(x,6.2,z);world.add(c);}building(-18,-20,9,7,3.8,wall);building(18,19,8,7,3.5,accent);
  }else{for(let i=0;i<48;i++){const rock=new THREE.Mesh(new THREE.DodecahedronGeometry(rand(2,5),1),debris);rock.position.set(rand(-36,36),rand(.5,2.4),rand(-36,36));rock.scale.set(1,1.4,1.25);world.add(rock);}building(-20,-17,10,9,4.5,wall);building(20,-17,10,9,4.5,wall);building(0,-27,17,7,5,darkConcrete);addTank(-11,17);}
+ // Large horizon silhouettes make each operation feel like a real, connected battlefield.
+ const horizonMat=mat(idx===5?0x263d2b:idx===1?0x8b7658:idx===6?0x59636a:0x3b4948,.98);
+ const farMat=mat(idx===5?0x1d3426:idx===1?0xa68b63:idx===6?0x68747a:0x59645d,1);
+ for(let side=-1;side<=1;side+=2){
+  for(let n=0;n<5;n++){
+   const z=-54+n*26,x=side*(49+rand(0,5)),h=rand(9,18),w=rand(7,13);
+   if(idx===5){
+    const trunk=new THREE.Mesh(new THREE.CylinderGeometry(.32,.58,h*.55,7),horizonMat);trunk.position.set(x,h*.25,z);world.add(trunk);
+    for(let tier=0;tier<3;tier++){const crown=new THREE.Mesh(new THREE.ConeGeometry(w*(.43-tier*.08),h*.42,7),farMat);crown.position.set(x,h*.48+tier*h*.16,z);crown.castShadow=false;world.add(crown);}
+   }else if(idx===6){
+    const peak=new THREE.Mesh(new THREE.ConeGeometry(w,h,7),farMat);peak.position.set(x,h/2-1,z);peak.scale.z=1.6;world.add(peak);
+    const snow=new THREE.Mesh(new THREE.ConeGeometry(w*.34,h*.38,7),mat(0xb7c0c0));snow.position.set(x,h*.79-1,z);world.add(snow);
+   }else if(idx===1){
+    const mesa=new THREE.Mesh(new THREE.CylinderGeometry(w*.72,w,h*.55,6),farMat);mesa.position.set(x,h*.18,z);world.add(mesa);
+   }else{
+    const silhouette=new THREE.Mesh(new THREE.BoxGeometry(w,h,rand(5,12)),horizonMat);silhouette.position.set(x,h/2-1,z);world.add(silhouette);
+    if(idx===2||idx===4){const stack=new THREE.Mesh(new THREE.CylinderGeometry(.45,.65,h+8,8),steel);stack.position.set(x+w*.32,(h+8)/2-1,z);world.add(stack);}
+   }
+  }
+ }
+ // Distinctive landmarks visible beyond the playable perimeter for every phase.
+ if(idx===0){for(let i=0;i<7;i++){const tower=box(-48+i*16,rand(5,10),-62,5,rand(10,20),5,horizonMat,false);tower.rotation.y=rand(-.2,.2);}}
+ if(idx===1){for(let i=0;i<4;i++){const mast=new THREE.Mesh(new THREE.CylinderGeometry(.12,.2,15,8),steel);mast.position.set(-34+i*22,7.5,-48);world.add(mast);}}
+ if(idx===2){for(let i=0;i<3;i++){const crane=new THREE.Group();const post=new THREE.Mesh(new THREE.BoxGeometry(.45,17,.45),steel);post.position.y=8.5;crane.add(post);const arm=new THREE.Mesh(new THREE.BoxGeometry(12,.35,.35),accent);arm.position.set(5,16,0);crane.add(arm);crane.position.set(-42+i*42,0,-54);world.add(crane);}}
+ if(idx===3){for(let i=0;i<5;i++){const tent=new THREE.Mesh(new THREE.ConeGeometry(4,5,4),accent);tent.position.set(-34+i*17,2.5,-48);tent.rotation.y=Math.PI/4;world.add(tent);}}
+ if(idx===4){for(let i=0;i<3;i++){const hangar=box(-34+i*34,7,-55,17,14,9,horizonMat,false);const door=box(-34+i*34,4,-50,9,8,.2,trim,false);}}
+ if(idx===5){for(let i=0;i<18;i++){const x=rand(-62,62),z=rand(-65,-43),tree=new THREE.Mesh(new THREE.ConeGeometry(rand(3,5),rand(9,17),7),farMat);tree.position.set(x,tree.geometry.parameters.height/2,z);world.add(tree);}}
+ if(idx===6){for(let i=0;i<4;i++){const ridge=new THREE.Mesh(new THREE.ConeGeometry(15,rand(16,25),5),farMat);ridge.position.set(-45+i*30,8,-60);ridge.scale.z=1.8;world.add(ridge);}}
  for(let i=0;i<180;i++){const x=rand(-36,36),z=rand(-36,36);if(Math.abs(x)<4&&z>0&&z<12)continue;const r=rand(.12,.55);const rock=new THREE.Mesh(new THREE.DodecahedronGeometry(r,0),debris);rock.position.set(x,-.02+r*.25,z);rock.rotation.set(rand(0,3),rand(0,3),rand(0,3));world.add(rock);}
  for(let i=0;i<6;i++){const barrel=new THREE.Mesh(new THREE.CylinderGeometry(.38,.42,1.05,16),mat(idx===1?0x75603f:0x59483b));barrel.position.set(rand(-22,22),.52,rand(-22,22));barrel.castShadow=true;world.add(barrel);}
   // Extra waist-high wooden cover positions, spread through each combat lane.

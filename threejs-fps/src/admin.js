@@ -163,6 +163,20 @@ $('admin-login-form').addEventListener('submit', async event => {
   }
 });
 $('admin-refresh').addEventListener('click', loadPlayers);
+$('admin-play').addEventListener('click', async () => {
+  const button = $('admin-play');
+  button.disabled = true;
+  button.textContent = 'LIBERANDO ACESSO...';
+  try {
+    const data = await api('/api/admin/game-access', { method: 'POST', body: '{}' });
+    sessionStorage.setItem('tacticalStrikeAdminGameToken', data.token);
+    window.location.assign('/');
+  } catch (error) {
+    message('admin-dashboard-message', error.message, true);
+    button.disabled = false;
+    button.textContent = 'JOGAR';
+  }
+});
 $('admin-logout').addEventListener('click', () => {
   adminToken = '';
   sessionStorage.removeItem('tacticalStrikeAdminToken');

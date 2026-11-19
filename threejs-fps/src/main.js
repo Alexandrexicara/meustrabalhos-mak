@@ -320,7 +320,7 @@ function detonateRocket(projectile,point){
 function updateRocketProjectiles(dt){
  for(let i=rocketProjectiles.length-1;i>=0;i--){
   const p=rocketProjectiles[i],previous=p.mesh.position.clone(),step=p.velocity.clone().multiplyScalar(dt),distance=step.length();
-  p.mesh.position.add(step);p.life-=dt;
+  p.mesh.position.add(step);p.life-=dt;raycaster.set(previous,step.clone().normalize());raycaster.far=distance+1.2;
   if(!helicopterDestroyed&&patrolAircraft.visible){
    const heliHit=raycaster.intersectObject(patrolAircraft,true).find(h=>h.object.visible);
    if(heliHit&&heliHit.point.distanceTo(previous)<=distance+1.1){helicopterDestroyed=true;patrolAircraft.visible=false;for(const b of heliBullets)scene.remove(b.mesh);heliBullets.length=0;detonateRocket(p,heliHit.point);rocketProjectiles.splice(i,1);toast('HELICÓPTERO DERRUBADO // ALVO DESTRUÍDO');continue;}

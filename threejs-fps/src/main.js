@@ -557,7 +557,7 @@ function throwGrenade(){
  grenadeInHand.visible=true;grenadeThrowAge=0;
 }
 function releaseGrenadeFromLeftHand(){
- leftArmRig.updateMatrixWorld(true);const start=new THREE.Vector3();grenadeInHand.getWorldPosition(start);
+ camera.updateMatrixWorld(true);leftArmRig.updateMatrixWorld(true);const start=new THREE.Vector3();grenadeInHand.getWorldPosition(start);
  grenadeInHand.visible=false;
  const grenade=new THREE.Mesh(new THREE.SphereGeometry(.105,12,10),mat(0x45513b,.72,.18));
  grenade.position.copy(start);grenade.castShadow=true;scene.add(grenade);
@@ -566,9 +566,9 @@ function releaseGrenadeFromLeftHand(){
  // The throw begins at the left glove, not at the camera center.
  grenades.push({mesh:grenade,velocity,fuse:2.15,bounced:false});
 }
-function updateFirstPersonRig(dt){
+function updateFirstPersonRig(dt,crouched){
  const walking=Math.sin(bob*1.7)*.008;
- operatorBody.position.y=walking;
+ operatorBody.position.y=(crouched?-.18:0)+walking;
  rightArmRig.rotation.x=-recoil*.62;
  rightArmRig.rotation.z=Math.sin(bob*.85)*.012;
  if(grenadeThrowAge>=0){
@@ -734,7 +734,7 @@ function update(dt){
   if(keys.Space&&player.onGround){player.velocity.y=5.1;player.onGround=false;}player.velocity.y-=14*dt;
   if(player.onGround){camera.position.y=THREE.MathUtils.damp(camera.position.y,eyeHeight,18,dt);if(Math.abs(camera.position.y-eyeHeight)<.015)camera.position.y=eyeHeight;}
   else{camera.position.y+=player.velocity.y*dt;if(camera.position.y<=eyeHeight){camera.position.y=eyeHeight;player.velocity.y=0;player.onGround=true;}}
-  weapon.position.y=Math.sin(bob*1.7)*.012-recoil*.5+(crouched?-.22:0);weapon.position.x=Math.cos(bob*.85)*.008;weapon.rotation.x=-recoil+(crouched?.035:0);operatorBody.position.y+=(crouched?-.18:0);operatorLegs.visible=camera.rotation.x<-.20;operatorLegs.position.y=crouched?-.12:0;updateFirstPersonRig(dt);
+  weapon.position.y=Math.sin(bob*1.7)*.012-recoil*.5+(crouched?-.22:0);weapon.position.x=Math.cos(bob*.85)*.008;weapon.rotation.x=-recoil+(crouched?.035:0);operatorLegs.visible=camera.rotation.x<-.20;operatorLegs.position.y=crouched?-.12:0;updateFirstPersonRig(dt,crouched);
   updateBots(dt);updateProjectiles(dt);for(const p of supplyPickups){p.phase+=dt*1.8;p.icon.position.y=p.baseY+Math.sin(p.phase)*.09;p.label.position.y=.72+Math.sin(p.phase)*.09;}collectSupplyPickups();updateMission(dt);updateCampaignRoute(dt);
   if(Math.floor(elapsed*3)%2===0)updateRadar();
  }

@@ -374,7 +374,7 @@ function spawnSupplyPickups(){
 function collectSupplyPickups(){for(let i=supplyPickups.length-1;i>=0;i--){const p=supplyPickups[i];if(Math.hypot(camera.position.x-p.x,camera.position.z-p.z)>2.25)continue;if(p.type==='launcher'&&!onRooftop)continue;let message='';if(p.type==='rifle'){player.reserve+=60;message='CAIXA DE FUZIL // +60 CARTUCHOS';}else if(p.type==='pistol'){player.pistolReserve+=24;message='CAIXA DE PISTOLA // +24 CARTUCHOS';}else if(p.type==='grenade'){const before=player.grenades;player.grenades=Math.min(5,player.grenades+2);message=player.grenades>before?'GRANADAS RECOLHIDAS // +'+(player.grenades-before):'BOLSAS DE GRANADA JÁ ESTÃO CHEIAS';}else{if(player.rocketAmmo>0){toast('LANÇA-FOGUETES JÁ CARREGADO // USE ANTES DE PEGAR OUTRO');continue;}player.rocketAmmo=1;setWeapon('launcher');message='AT-4 RECOLHIDO // 1 FOGUETE';}world.remove(p.g);supplyPickups.splice(i,1);toast(message);updateHUD();}}
 
 const player={health:100,ammo:30,reserve:120,pistolAmmo:12,pistolReserve:48,rocketAmmo:0,weaponType:'rifle',grenades:3,kills:0,shots:0,hits:0,round:1,reloading:false,alive:true,active:true,velocity:new THREE.Vector3(),onGround:true};
-const bots=[]; const bullets=[]; const enemyBullets=[]; const grenades=[]; const explosions=[]; const bloodParticles=[]; const clock=new THREE.Clock();
+const bots=[]; const allies=[]; const bullets=[]; const enemyBullets=[]; const grenades=[]; const explosions=[]; const bloodParticles=[]; const clock=new THREE.Clock();
 let missionMarker=null,routeMarker=null,routeActive=false,missionKind='eliminate',missionProgress=0,missionDuration=0,missionX=0,missionZ=-8,missionDone=false; const raycaster=new THREE.Raycaster();
 const keys={}; let pointerLocked=false, elapsed=0, roundTime=120, recoil=0, bob=0, shotCooldown=0, toastTimeout;
 const isTouchDevice=window.matchMedia('(pointer: coarse)').matches||navigator.maxTouchPoints>0;
@@ -513,9 +513,38 @@ function makeBot(index){
  scene.add(group);const bot={group,hp,hpbg,health:100,maxHealth:100,fire:rand(.55,1.15),speed:rand(1.35,1.8),alerted:false,strafe:index%2?1:-1,alive:true,hitFlash:0,mixer:null};bots.push(bot);
  if(soldierTemplate)attachSoldier(bot);return bot;
 }
+
+function spawnAllies(){
+ // Four friendly AI soldiers are separate from the hostile wave and never count as enemies.
+ const offsets=[[-2.4,3.1],[2.4,3.1],[-4.1,5.2],[4.1,5.2]];
+ for(let i=0;i<4;i++){
+  const ally=makeBot(60+i);bots.pop();ally.ally=true;ally.health=180;ally.maxHealth=180;ally.fire=rand(.4,1.1);ally.alerted=false;ally.group.position.set(camera.position.x+offsets[i][0],0,camera.position.z+offsets[i][1]);ally.group.userData.squadName=['ALPHA-2','BRAVO-2','CHARLIE-2','DELTA-2'][i];allies.push(ally);
+ }
+ $('objective-sub').textContent='SQUAD SUPPORT ACTIVE // 4 ALLIED OPERATORS';
+}
+function updateAllies(dt){
+ for(let i=0;i<allies.length;i++){
+  const a=allies[i];if(!a.alive){if(a.dying){a.deathAge+=dt;const t=Math.min(1,a.deathAge/.48);a.group.rotation.z=a.deathSide*1.48*t;a.group.position.y=a.deathStartY-.78*t;if(t>=1){a.dying=false;a.corpse=true;}}continue;}
+  if(a.mixer)a.mixer.update(dt);
+  const angle=camera.rotation.y,offset=[[-2.4,3.1],[2.4,3.1],[-4.1,5.2],[4.1,5.2]][i];
+  const desiredX=camera.position.x+offset[0]*Math.cos(angle)+offset[1]*Math.sin(angle);
+  const desiredZ=camera.position.z-offset[0]*Math.sin(angle)+offset[1]*Math.cos(angle);
+  const dx=desiredX-a.group.position.x,dz=desiredZ-a.group.position.z,dist=Math.hypot(dx,dz);
+  if(dist>1.15){const step=Math.min(dist-1.05,a.speed*1.65*dt);const nx=a.group.position.x+dx/dist*step,nz=a.group.position.z+dz/dist*step;if(!moveBlocked(nx,a.group.position.z))a.group.position.x=nx;if(!moveBlocked(a.group.position.x,nz))a.group.position.z=nz;setBotAnimation(a,'run');}
+  else setBotAnimation(a,'idle');
+  let target=null,best=32;
+  for(const enemy of bots){if(!enemy.alive)continue;const d=a.group.position.distanceTo(enemy.group.position);if(d<best){best=d;target=enemy;}}
+  if(target){
+   const aim=target.group.position.clone().add(new THREE.Vector3(0,1.25,0)),origin=a.group.position.clone().add(new THREE.Vector3(0,1.42,0)),delta=aim.clone().sub(origin),distance=delta.length();
+   a.group.rotation.y=Math.atan2(delta.x,delta.z);a.fire-=dt;
+   if(a.fire<=0&&distance<32){raycaster.set(origin,delta.normalize());raycaster.far=distance;const block=raycaster.intersectObjects(world.children,true).find(hit=>hit.object.isMesh&&hit.object.visible);if(!block||block.distance>distance-.45){a.fire=rand(.72,1.05);damageBot(target,rand(7,11),aim,'ALLY');const end=aim.clone();const geometry=new THREE.BufferGeometry().setFromPoints([origin,end]);const line=new THREE.Line(geometry,new THREE.LineBasicMaterial({color:0x9bffb0,transparent:true,opacity:.8}));scene.add(line);setTimeout(()=>{scene.remove(line);geometry.dispose();line.material.dispose();},90);}}
+  }
+ }
+}
+
 function spawnWave(){
- onRooftop=false;helicopterDestroyed=false;patrolAircraft.visible=true;routeActive=false;if(routeMarker){world.remove(routeMarker);routeMarker=null;}buildMap(player.round);spawnSupplyPickups();for(const b of bots)scene.remove(b.group);bots.length=0;
- const count=Math.min(18+(player.round-1)*4,40);for(let i=0;i<count;i++){const bot=makeBot(i);if(i<4){const roofSpots=[[-4.2,-19.2],[4.2,-19.2],[-2.7,-13.8],[2.7,-13.8]];bot.group.position.set(roofSpots[i][0],roofTopHeight,roofSpots[i][1]);}}
+ onRooftop=false;helicopterDestroyed=false;patrolAircraft.visible=true;routeActive=false;if(routeMarker){world.remove(routeMarker);routeMarker=null;}buildMap(player.round);spawnSupplyPickups();for(const b of bots)scene.remove(b.group);bots.length=0;for(const a of allies)scene.remove(a.group);allies.length=0;
+ const count=Math.min(18+(player.round-1)*4,40);for(let i=0;i<count;i++){const bot=makeBot(i);if(i<4){const roofSpots=[[-4.2,-19.2],[4.2,-19.2],[-2.7,-13.8],[2.7,-13.8]];bot.group.position.set(roofSpots[i][0],roofTopHeight,roofSpots[i][1]);}}spawnAllies();
  $('wave').textContent=String(count).padStart(2,'0');$('radar-count').textContent=String(count).padStart(2,'0');
  $('round-label').textContent='ROUND '+String(player.round).padStart(2,'0');
  const missions=[
@@ -612,7 +641,7 @@ function killBot(bot,source='BULLET'){
  if(!bot.alive)return;
  bot.alive=false;bot.dying=true;bot.deathAge=0;bot.deathSide=Math.random()<.5?-1:1;
  bot.deathStartY=bot.group.position.y;bot.hp.visible=false;bot.hpbg.visible=false;
- bot.fire=999;player.kills++;
+ bot.fire=999;if(source!=='ALLY')player.kills++;
  toast(source==='FRAG'?'HOSTILE ELIMINATED // FRAG':'HOSTILE NEUTRALIZED');
 }
 function damageBot(bot,amount,impact,source='BULLET'){
@@ -711,6 +740,18 @@ $('retry-btn').addEventListener('click',()=>{gameoverScreen.classList.add('hidde
 canvas.addEventListener('click',()=>{if(!isTouchDevice&&!pointerLocked&&player.active&&player.alive)canvas.requestPointerLock?.();});
 document.addEventListener('pointerlockchange',()=>{pointerLocked=document.pointerLockElement===canvas;if(!pointerLocked&&player.active&&player.alive&&!startScreen.classList.contains('hidden'))return;if(!pointerLocked&&player.active&&player.alive){pauseScreen.classList.remove('hidden');}else{pauseScreen.classList.add('hidden');}});
 document.addEventListener('mousemove',e=>{if(!pointerLocked||!player.active)return;camera.rotation.order='YXZ';camera.rotation.y-=e.movementX*.0015;camera.rotation.x-=e.movementY*.0015;camera.rotation.x=THREE.MathUtils.clamp(camera.rotation.x,-1.35,1.35);});
+
+
+// Quick HUD panels: start hidden to keep the combat view clear on desktop and mobile.
+const radarPanel=document.querySelector('.radar-card');
+const weaponPanel=document.querySelector('.weapon-card');
+const radarToggle=$('toggle-radar');
+const weaponsToggle=$('toggle-weapons');
+function setCombatPanel(panel,button,visible){if(!panel||!button)return;panel.classList.toggle('panel-collapsed',!visible);button.setAttribute('aria-expanded',String(visible));button.classList.toggle('is-active',visible);}
+setCombatPanel(radarPanel,radarToggle,false);
+setCombatPanel(weaponPanel,weaponsToggle,false);
+radarToggle?.addEventListener('click',()=>setCombatPanel(radarPanel,radarToggle,radarPanel.classList.contains('panel-collapsed')));
+weaponsToggle?.addEventListener('click',()=>setCombatPanel(weaponPanel,weaponsToggle,weaponPanel.classList.contains('panel-collapsed')));
 
 // Touchscreen controls: virtual movement stick, drag-to-look, and action buttons.
 if(isTouchDevice){
@@ -830,7 +871,7 @@ function update(dt){
   if(player.onGround){camera.position.y=THREE.MathUtils.damp(camera.position.y,eyeHeight,18,dt);if(Math.abs(camera.position.y-eyeHeight)<.015)camera.position.y=eyeHeight;}
   else{camera.position.y+=player.velocity.y*dt;if(camera.position.y<=eyeHeight){camera.position.y=eyeHeight;player.velocity.y=0;player.onGround=true;}}
   weapon.position.y=Math.sin(bob*1.7)*.012-recoil*.5+(crouched?-.22:0);weapon.position.x=Math.cos(bob*.85)*.008;weapon.rotation.x=-recoil+(crouched?.035:0);operatorLegs.visible=camera.rotation.x<-.10;operatorLegs.position.y=crouched?-.12:0;updateFirstPersonRig(dt,crouched);
-  const nearLadder=Math.hypot(camera.position.x-ladderPosition.x,camera.position.z-ladderPosition.z)<2.2;if(keys.KeyE&&!nearLadder)keys.KeyE=false;if(isTouchDevice){const lb=$('mobile-ladder');if(lb){lb.style.display=nearLadder?'block':'none';lb.textContent=onRooftop?'DESCER ESCADA':'SUBIR ESCADA';}}updateBots(dt);updateProjectiles(dt);for(const p of supplyPickups){p.phase+=dt*1.8;p.icon.position.y=p.baseY+Math.sin(p.phase)*.09;p.label.position.y=.72+Math.sin(p.phase)*.09;}collectSupplyPickups();updateMission(dt);updateCampaignRoute(dt);
+  const nearLadder=Math.hypot(camera.position.x-ladderPosition.x,camera.position.z-ladderPosition.z)<2.2;if(keys.KeyE&&!nearLadder)keys.KeyE=false;if(isTouchDevice){const lb=$('mobile-ladder');if(lb){lb.style.display=nearLadder?'block':'none';lb.textContent=onRooftop?'DESCER ESCADA':'SUBIR ESCADA';}}updateBots(dt);updateAllies(dt);updateProjectiles(dt);for(const p of supplyPickups){p.phase+=dt*1.8;p.icon.position.y=p.baseY+Math.sin(p.phase)*.09;p.label.position.y=.72+Math.sin(p.phase)*.09;}collectSupplyPickups();updateMission(dt);updateCampaignRoute(dt);
   if(Math.floor(elapsed*3)%2===0)updateRadar();
  }
  $('clock').textContent=String(Math.floor(elapsed/60)).padStart(2,'0')+':'+String(Math.floor(elapsed%60)).padStart(2,'0');

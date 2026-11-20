@@ -172,13 +172,13 @@ async function launchAdminGame(destination = '/') {
 $('admin-play')?.addEventListener('click', async () => {
   const button = $('admin-play');
   button.disabled = true;
-  button.textContent = 'LIBERANDO ACESSO...';
+  button.textContent = 'VALIDANDO ACESSO...';
   try {
     await launchAdminGame('/');
   } catch (error) {
     message('admin-dashboard-message', error.message, true);
     button.disabled = false;
-    button.textContent = 'JOGAR';
+    button.textContent = 'INICIAR JOGO';
   }
 });
 

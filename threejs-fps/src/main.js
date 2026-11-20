@@ -474,7 +474,7 @@ function attachSoldier(bot){
  if(!soldierTemplate||!bot.alive)return;
  const old=bot.group.getObjectByName('fallback-body');
  // Keep the fallback rifle for every soldier; it will be repositioned from the rig's hand bones.
- const fallbackWeapon=old?old.getObjectByName('held-rifle'):null;
+ const fallbackWeapon=bot.heldRifle||(old?old.getObjectByName('held-rifle'):null);
  const model=cloneSkeleton(soldierTemplate);model.name='rigged-soldier';model.scale.setScalar(1.0);model.position.y=0;
  // Soldier.glb already faces -Z, the same forward direction as the player.
  model.rotation.y=0;
@@ -499,7 +499,7 @@ function attachSoldier(bot){
  if(fallbackWeapon){
   model.add(fallbackWeapon);
   fallbackWeapon.traverse(o=>{if(o.isMesh){o.castShadow=true;o.receiveShadow=true;}});
-  bot.heldRifle=fallbackWeapon;
+  bot.heldRifle=fallbackWeapon;bot.heldRifle.visible=true;
  }
  bot.rightHand=null;bot.leftHand=null;bot.rightArm=null;bot.leftArm=null;bot.rightForeArm=null;bot.leftForeArm=null;
  model.traverse(o=>{
@@ -596,7 +596,7 @@ function makeBot(index){
  }
  if(!spawn)spawn=bestCandidate||{x:THREE.MathUtils.clamp((index%4-1.5)*5,-20,20),z:THREE.MathUtils.clamp(-12-Math.floor(index/4)*4,-22,22)};
  group.position.set(spawn.x,0,spawn.z);
- scene.add(group);const bot={group,hp,hpbg,ally:index>=60,health:100,maxHealth:100,fire:rand(.55,1.15),speed:rand(1.35,1.8),alerted:false,strafe:index%2?1:-1,alive:true,hitFlash:0,mixer:null};bots.push(bot);
+ scene.add(group);const bot={group,hp,hpbg,heldRifle:rifle,ally:index>=60,health:100,maxHealth:100,fire:rand(.55,1.15),speed:rand(1.35,1.8),alerted:false,strafe:index%2?1:-1,alive:true,hitFlash:0,mixer:null};bots.push(bot);
  if(soldierTemplate)attachSoldier(bot);return bot;
 }
 
@@ -718,18 +718,32 @@ function updateHUD(){
  $('radar-count').textContent=String(bots.filter(b=>b.alive).length).padStart(2,'0');$('wave').textContent=String(bots.filter(b=>b.alive).length).padStart(2,'0');
  const bars=$('ammo-bars');bars.innerHTML='';const cap=player.weaponType==='pistol'?12:player.weaponType==='launcher'?1:30;const barLoaded=player.weaponType==='pistol'?player.pistolAmmo:player.weaponType==='launcher'?player.rocketAmmo:player.ammo;for(let i=0;i<cap;i++){const el=document.createElement('i');if(i>=barLoaded)el.className='empty';bars.append(el);}
 }
-function moveBlocked(x,z){
+function moveBlocked(x,z,eyeY=camera.position.y){
  if(Math.abs(x)>mapBounds||Math.abs(z)>mapBounds)return true;
  // Collision is evaluated in 3D: a rooftop slab blocks the player only while
  // the player's body overlaps its vertical range. This prevents the roof from
  // acting like an invisible wall after the player has climbed down or fallen.
- const playerFeet=camera.position.y-1.55,playerHead=camera.position.y+.16;
+ const playerFeet=eyeY-1.55,playerHead=eyeY+.16;
  return colliders.some(c=>{
   const verticalOverlap=playerFeet<(c.top??Infinity)-.02&&playerHead>(c.bottom??0)+.02;
   return verticalOverlap&&Math.abs(x-c.x)<c.hx+.42&&Math.abs(z-c.z)<c.hz+.42;
  });
 }
+function recoverPlayerFromCollision(maxRadius=10){
+ if(!moveBlocked(camera.position.x,camera.position.z))return true;
+ const ox=camera.position.x,oz=camera.position.z;
+ for(let radius=.18;radius<=maxRadius;radius+=.18){
+  for(let a=0;a<Math.PI*2;a+=Math.PI/12){
+   const x=THREE.MathUtils.clamp(ox+Math.cos(a)*radius,-mapBounds,mapBounds);
+   const z=THREE.MathUtils.clamp(oz+Math.sin(a)*radius,-mapBounds,mapBounds);
+   if(!moveBlocked(x,z)){camera.position.x=x;camera.position.z=z;player.velocity.y=0;player.onGround=true;return true;}
+  }
+ }
+ return false;
+}
 function movePlayerHorizontal(dx,dz){
+ // First clear any overlap left by a rooftop landing, ladder exit or moving obstacle.
+ recoverPlayerFromCollision();
  // Small swept steps prevent tunnelling and let the player slide along either
  // side of a wall/corner instead of becoming locked against the collider.
  const distance=Math.hypot(dx,dz),steps=Math.max(1,Math.ceil(distance/.14));
@@ -760,15 +774,20 @@ function movePlayerHorizontal(dx,dz){
 }
 function damagePlayer(amount){if(!player.alive)return;playSound('damage');player.health=Math.max(0,player.health-amount);$('damage-flash').classList.add('show');setTimeout(()=>$('damage-flash').classList.remove('show'),100);updateHUD();if(player.health<=0){player.alive=false;player.active=false;document.exitPointerLock?.();$('gameover-copy').textContent='You neutralized '+player.kills+' hostiles across '+player.round+' rounds.';gameoverScreen.classList.remove('hidden');}}
 function fireBot(bot,dt){
+ // A hostile may fire only while its living body and its own attached rifle are visible.
+ const body=bot?.model||bot?.group?.getObjectByName('fallback-body');
+ const rifle=bot?.heldRifle;
+ if(!bot?.alive||!bot.group.visible||!body?.visible||!rifle?.visible||!rifle.parent)return;
+ bot.group.updateWorldMatrix(true,true);rifle.updateWorldMatrix(true,false);
  bot.fire-=dt;if(bot.fire>0)return;bot.fire=rand(1.15,1.65);
- const origin=bot.heldRifle?bot.heldRifle.localToWorld(new THREE.Vector3(0,0,.94)):bot.group.localToWorld(new THREE.Vector3(0,1.32,.42));
+ const origin=rifle.localToWorld(new THREE.Vector3(0,0,.68));
  const target=camera.position.clone().add(new THREE.Vector3(rand(-.9,.9),rand(-.55,.55),rand(-.9,.9)));
  const delta=target.clone().sub(origin),distance=delta.length(),direction=delta.normalize();
  // A hostile cannot shoot through a building, wall, crate or other solid map object.
  raycaster.set(origin,direction);raycaster.far=distance;
  const obstruction=raycaster.intersectObjects(world.children,true).find(hit=>hit.object.isMesh&&hit.object.visible);
  if(obstruction&&obstruction.distance<distance-.35)return;
- if(bot.heldRifle){const flash=new THREE.Mesh(new THREE.SphereGeometry(.065,8,6),new THREE.MeshBasicMaterial({color:0xffc16a,transparent:true,opacity:.98,blending:THREE.AdditiveBlending,depthWrite:false}));flash.position.set(0,0,.96);bot.heldRifle.add(flash);setTimeout(()=>{bot.heldRifle?.remove(flash);flash.geometry.dispose();flash.material.dispose();},65);}
+ const flash=new THREE.Mesh(new THREE.SphereGeometry(.065,8,6),new THREE.MeshBasicMaterial({color:0xffc16a,transparent:true,opacity:.98,blending:THREE.AdditiveBlending,depthWrite:false}));flash.position.set(0,0,.68);rifle.add(flash);setTimeout(()=>{rifle.remove(flash);flash.geometry.dispose();flash.material.dispose();},65);
  const tracer=new THREE.Mesh(new THREE.CylinderGeometry(.014,.014,.58,6),new THREE.MeshBasicMaterial({color:0xffb36b,emissive:0x8b3a12}));
  tracer.position.copy(origin);tracer.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0),direction);scene.add(tracer);
  enemyBullets.push({mesh:tracer,velocity:direction.clone().multiplyScalar(36),life:Math.min(1.15,distance/36+.08),damage:rand(2,3)});
@@ -854,7 +873,7 @@ function updateLadderClimb(dt){
  leftArmRig.rotation.set(-.92-reach*.22,0,.28-Math.max(0,pull)*.22);
  weapon.visible=false;operatorLegs.visible=true;operatorLegs.position.y=-.22+Math.sin(cycle*2)*.025;
  if(t>=1){const up=ladderClimb.direction==='up';ladderClimb.active=false;weapon.visible=true;rightArmRig.rotation.set(0,0,0);leftArmRig.rotation.set(0,0,0);operatorLegs.position.y=0;
-  onRooftop=up;player.onGround=true;player.velocity.y=0;camera.position.copy(ladderClimb.end);camera.rotation.x=0;keys.KeyE=false;keys.Space=false;toast(ladderClimb.direction==='tank'?'TANQUE ALCANÇADO':up?'LAJE ALCANÇADA // ESCADA':'DESCIDA CONCLUÍDA // CHÃO');}
+  onRooftop=up;player.onGround=true;player.velocity.y=0;camera.position.copy(ladderClimb.end);camera.rotation.x=0;if(!up)recoverPlayerFromCollision(10);keys.KeyE=false;keys.Space=false;toast(ladderClimb.direction==='tank'?'TANQUE ALCANÇADO':up?'LAJE ALCANÇADA // ESCADA':'DESCIDA CONCLUÍDA // CHÃO');}
  return true;
 }
 function beginTankClimb(v){ladderClimb.active=true;ladderClimb.direction='tank';ladderClimb.time=0;ladderClimb.duration=2.4;const d=new THREE.Vector3(camera.position.x-v.tank.position.x,0,camera.position.z-v.tank.position.z).normalize();ladderClimb.start.copy(camera.position);ladderClimb.end.set(v.tank.position.x+d.x*.7,4.05,v.tank.position.z+d.z*.7);camera.position.copy(ladderClimb.start);player.onGround=false;player.velocity.y=0;keys.KeyE=false;toast('SUBINDO NO TANQUE...');}
@@ -1060,7 +1079,7 @@ function update(dt){
    if(keys.Space&&player.onGround&&!onRooftop){player.velocity.y=5.1;player.onGround=false;}
    if(!ladderClimb.active){const eyeHeight=onRooftop?roofTopHeight+1.72:(crouched?1.12:1.72);player.velocity.y-=14*dt;
     if(player.onGround){camera.position.y=THREE.MathUtils.damp(camera.position.y,eyeHeight,18,dt);if(Math.abs(camera.position.y-eyeHeight)<.015)camera.position.y=eyeHeight;}
-    else{camera.position.y+=player.velocity.y*dt;if(camera.position.y<=eyeHeight){camera.position.y=eyeHeight;player.velocity.y=0;player.onGround=true;}}
+    else{camera.position.y+=player.velocity.y*dt;if(camera.position.y<=eyeHeight){camera.position.y=eyeHeight;player.velocity.y=0;player.onGround=true;recoverPlayerFromCollision(10);}}
    }
   }
   weapon.position.y=Math.sin(bob*1.7)*.012-recoil*.5+(crouched?-.22:0);weapon.position.x=Math.cos(bob*.85)*.008;weapon.rotation.x=-recoil+(crouched?.035:0);operatorLegs.visible=camera.rotation.x<-.10||ladderClimb.active;operatorLegs.position.y=crouched?-.12:0;if(!ladderClimb.active)updateFirstPersonRig(dt,crouched);

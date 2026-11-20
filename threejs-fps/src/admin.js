@@ -163,19 +163,38 @@ $('admin-login-form').addEventListener('submit', async event => {
   }
 });
 $('admin-refresh').addEventListener('click', loadPlayers);
-$('admin-play').addEventListener('click', async () => {
+async function launchAdminGame(destination = '/') {
+  const data = await api('/api/admin/game-access', { method: 'POST', body: '{}' });
+  sessionStorage.setItem('tacticalStrikeAdminGameToken', data.token);
+  window.location.assign(destination);
+}
+
+$('admin-play')?.addEventListener('click', async () => {
   const button = $('admin-play');
   button.disabled = true;
   button.textContent = 'LIBERANDO ACESSO...';
   try {
-    const data = await api('/api/admin/game-access', { method: 'POST', body: '{}' });
-    sessionStorage.setItem('tacticalStrikeAdminGameToken', data.token);
-    window.location.assign('/');
+    await launchAdminGame('/');
   } catch (error) {
     message('admin-dashboard-message', error.message, true);
     button.disabled = false;
     button.textContent = 'JOGAR';
   }
+});
+
+document.querySelectorAll('.admin-phase-card').forEach(link => {
+  link.addEventListener('click', async event => {
+    event.preventDefault();
+    if (link.dataset.launching === 'true') return;
+    link.dataset.launching = 'true';
+    message('admin-dashboard-message', 'LIBERANDO ACESSO À FASE...');
+    try {
+      await launchAdminGame(link.href);
+    } catch (error) {
+      link.dataset.launching = 'false';
+      message('admin-dashboard-message', error.message, true);
+    }
+  });
 });
 $('admin-logout').addEventListener('click', () => {
   adminToken = '';

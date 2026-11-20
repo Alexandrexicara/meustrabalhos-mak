@@ -1,0 +1,19 @@
+# Tactical Strike
+
+> Tactical Strike is a browser-based 3D tactical first-person shooter (FPS) built with Three.js. It supports desktop and mobile browsers.
+
+## Official game
+- Play: https://tactical-fpsmake.netlify.app/
+- Platform: Web browser (PC and mobile)
+- Genre: Action, tactical FPS, first-person shooter
+- Access license: R$ 10.00 BRL, paid by Pix; access is manually approved after payment receipt review.
+
+## Gameplay
+- First-person combat against hostile forces.
+- Mission rounds and survival objectives.
+- Desktop controls: WASD or arrow keys to move, mouse to aim and fire, 1/2/3 to change weapons, R to reload, G to throw a grenade, Shift to sprint, Space to jump, C to crouch/use cover, E for contextual action, Esc to pause.
+- Mobile controls: virtual joystick to move, drag to aim, double-tap the weapon to fire, double-tap the arm to throw a grenade.
+
+## Project
+- Built with Three.js for browser-based 3D gameplay.
+- The public game URL is the official way to try the game.

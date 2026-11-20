@@ -110,7 +110,11 @@ function addTank(x,z){
  const barrel=new THREE.Mesh(new THREE.CylinderGeometry(.13,.18,2.65,12),steel);barrel.rotation.z=Math.PI/2;barrel.position.set(1.45,.06,0);turret.add(barrel);
  const muzzle=new THREE.Mesh(new THREE.TorusGeometry(.14,.035,8,16),dark);muzzle.position.set(2.77,.06,0);muzzle.rotation.y=Math.PI/2;turret.add(muzzle);
  const mantlet=new THREE.Mesh(new THREE.SphereGeometry(.28,12,10),olive);mantlet.position.set(.55,.05,0);turret.add(mantlet);
- const crew=makeBot(40+combatVehicles.length);bots.pop();scene.remove(crew.group);crew.ally=false;crew.hp.visible=false;crew.hpbg.visible=false;crew.group.scale.setScalar(.88);crew.group.position.set(0,2.12,0);tank.add(crew.group);if(soldierTemplate)attachSoldier(crew);
+ const crew=makeBot(40+combatVehicles.length);bots.pop();scene.remove(crew.group);crew.ally=false;crew.hp.visible=false;crew.hpbg.visible=false;crew.group.scale.setScalar(.88);crew.group.position.set(0,2.12,0);tank.add(crew.group);
+ // Dedicated raycast hit volume: the tank crew must remain damageable even when the GLB skeleton has no directly hittable body mesh.
+ const crewHitbox=new THREE.Mesh(new THREE.CapsuleGeometry(.34,.82,5,9),new THREE.MeshBasicMaterial({color:0xffffff,transparent:true,opacity:0,depthWrite:false,colorWrite:false,side:THREE.DoubleSide}));
+ crewHitbox.name='tank-crew-damage-hitbox';crewHitbox.position.set(0,1.08,0);crewHitbox.userData.crewHitbox=true;crew.group.add(crewHitbox);crew.hitbox=crewHitbox;
+ if(soldierTemplate)attachSoldier(crew);
  tank.position.set(x,0,z);tank.rotation.y=Math.PI;world.add(tank);
  const collider={x,z,hx:2.55,hz:1.85,top:2.1};colliders.push(collider);
  combatVehicles.push({tank,turret,barrel,wheels,crew,collider,center:new THREE.Vector3(x,0,z),phase:Math.random()*Math.PI*2,cannonCooldown:rand(2.5,4.5),fire:rand(2,4)});
@@ -765,6 +769,15 @@ function damageBot(bot,amount,impact,source='BULLET'){
  if(impact)spawnBlood(impact);
  if(bot.health<=0)killBot(bot,source);
 }
+function updateAutomaticWeapon(){
+ if(!player.active||player.weaponType==='launcher')return;
+ const hostiles=[...bots.filter(b=>b.alive&&!b.ally),...combatVehicles.map(v=>v.crew).filter(b=>b?.alive)];
+ let nearest=Infinity;
+ for(const enemy of hostiles){const p=enemy.group.position;nearest=Math.min(nearest,Math.hypot(camera.position.x-p.x,camera.position.z-p.z));}
+ // Draw the sidearm only at true close-combat range; return to the rifle once distance opens up.
+ if(nearest<=4.4&&player.pistolAmmo>0&&player.weaponType!=='pistol')setWeapon('pistol');
+ else if(nearest>5.8&&player.weaponType==='pistol')setWeapon('rifle');
+}
 function shoot(){
  if(!player.active||(!pointerLocked&&!isTouchDevice)||player.reloading||shotCooldown>0)return;
  const type=player.weaponType;if(type==='rifle'&&player.ammo<=0&&player.reserve<=0){setWeapon('pistol');toast('FUZIL SEM MUNIÇÃO // PISTOLA SACADA');return;}if(type==='pistol'&&player.pistolAmmo<=0){toast('PISTOLA VAZIA // PROCURE MUNIÇÃO');return;}if(type==='launcher'&&player.rocketAmmo<=0){setWeapon('rifle');toast('LANÇA-FOGUETES DESCARTADO // FUZIL RESTAURADO');return;}if(type==='rifle')player.ammo--;else if(type==='pistol')player.pistolAmmo--;else{player.rocketAmmo=0;toast('FOGUETE DISPARADO // LANÇADOR DESCARTÁVEL');}player.shots++;playSound(type==='launcher'?'explosion':'shot');shotCooldown=type==='pistol'?.32:type==='launcher'?1.1:.2;recoil=Math.min(recoil+(type==='launcher'?.18:.09),.3);
@@ -1008,7 +1021,7 @@ function update(dt){
    }
   }
   weapon.position.y=Math.sin(bob*1.7)*.012-recoil*.5+(crouched?-.22:0);weapon.position.x=Math.cos(bob*.85)*.008;weapon.rotation.x=-recoil+(crouched?.035:0);operatorLegs.visible=camera.rotation.x<-.10||ladderClimb.active;operatorLegs.position.y=crouched?-.12:0;if(!ladderClimb.active)updateFirstPersonRig(dt,crouched);
-  const nearLadder=onRooftop?Math.hypot(camera.position.x-5.85,camera.position.z-ladderPosition.z)<2.5:Math.hypot(camera.position.x-ladderPosition.x,camera.position.z-(ladderPosition.z-1.05))<2.5;if(keys.KeyE&&!nearLadder)keys.KeyE=false;if(isTouchDevice){const lb=$('mobile-ladder');if(lb){lb.style.display=ladderClimb.active?'block':nearLadder?'block':'none';lb.textContent=ladderClimb.active?(ladderClimb.direction==='up'?'SUBINDO...':'DESCENDO...'):onRooftop?'DESCER ESCADA':'SUBIR ESCADA';}}updateBots(dt);updateAllies(dt);updateProjectiles(dt);for(const p of supplyPickups){p.phase+=dt*1.8;p.icon.position.y=p.baseY+Math.sin(p.phase)*.09;p.label.position.y=.72+Math.sin(p.phase)*.09;}collectSupplyPickups();updateMission(dt);updateCampaignRoute(dt);
+  const nearLadder=onRooftop?Math.hypot(camera.position.x-5.85,camera.position.z-ladderPosition.z)<2.5:Math.hypot(camera.position.x-ladderPosition.x,camera.position.z-(ladderPosition.z-1.05))<2.5;if(keys.KeyE&&!nearLadder)keys.KeyE=false;if(isTouchDevice){const lb=$('mobile-ladder');if(lb){lb.style.display=ladderClimb.active?'block':nearLadder?'block':'none';lb.textContent=ladderClimb.active?(ladderClimb.direction==='up'?'SUBINDO...':'DESCENDO...'):onRooftop?'DESCER ESCADA':'SUBIR ESCADA';}}updateAutomaticWeapon();updateBots(dt);updateAllies(dt);updateProjectiles(dt);for(const p of supplyPickups){p.phase+=dt*1.8;p.icon.position.y=p.baseY+Math.sin(p.phase)*.09;p.label.position.y=.72+Math.sin(p.phase)*.09;}collectSupplyPickups();updateMission(dt);updateCampaignRoute(dt);
   if(Math.floor(elapsed*3)%2===0)updateRadar();
  }
  $('clock').textContent=String(Math.floor(elapsed/60)).padStart(2,'0')+':'+String(Math.floor(elapsed%60)).padStart(2,'0');

@@ -17,19 +17,25 @@ $('check-license').addEventListener('click',refresh);
 $('license-logout').addEventListener('click',()=>{token='';localStorage.removeItem('tacticalStrikeToken');window.__tacticalLicenseActive=false;gate.classList.add('hidden');pay.classList.add('hidden');show('Você saiu da conta.');});
 $('license-back').addEventListener('click',()=>gate.classList.add('hidden'));
 async function validateAdminGameAccess(){
- const adminGameToken=sessionStorage.getItem('tacticalStrikeAdminGameToken');
- if(!adminGameToken)return;
+ const adminSession=sessionStorage.getItem('tacticalStrikeAdminGameToken');
+ if(!adminSession)return;
  try{
-  const response=await fetch(API+'/api/admin/game-access',{headers:{Authorization:'Bearer '+adminGameToken}});
-  if(!response.ok){sessionStorage.removeItem('tacticalStrikeAdminGameToken');return;}
-  const data=await response.json();
-  if(data.ok&&data.role==='admin'){
-   window.__tacticalLicenseActive=true;
-   gate.classList.add('hidden');
-   const launch=$('deploy-btn');
-   if(launch){launch.textContent='INICIAR OPERAÇÃO';}
-   show('Acesso administrativo liberado. Boa operação!');
+  // O token é o mesmo da sessão que já abriu o painel administrativo.
+  // Consultar o endpoint de administração confirma o papel sem exigir outra licença.
+  const response=await fetch(API+'/api/admin/players',{headers:{Authorization:'Bearer '+adminSession}});
+  if(!response.ok){
+   sessionStorage.removeItem('tacticalStrikeAdminGameToken');
+   return;
   }
- }catch(error){console.warn('Não foi possível validar o acesso administrativo.',error);}
+  window.__tacticalLicenseActive=true;
+  gate.classList.add('hidden');
+  const launch=$('deploy-btn');
+  if(launch){launch.innerHTML='INICIAR JOGO <span>↗</span>';}
+  const price=document.querySelector('.game-price');
+  if(price)price.classList.add('hidden');
+  const foot=document.querySelector('.start-foot');
+  if(foot)foot.classList.add('hidden');
+  show('Acesso administrativo liberado. Boa operação!');
+ }catch(error){console.warn('Não foi possível validar a sessão administrativa.',error);}
 }
 window.__tacticalAccessReady=validateAdminGameAccess().then(refresh).catch(error=>{console.warn('Admin access validation failed:',error);});

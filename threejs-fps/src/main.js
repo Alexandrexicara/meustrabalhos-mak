@@ -502,9 +502,21 @@ function updateHeldRifle(bot){
  pose('leftForeArm',new THREE.Vector3(0,0,1),1.02);
  bot.model.updateMatrixWorld(true);
  const right=bot.rightHand,left=bot.leftHand;
- // Keep the rifle across the upper chest in a ready-to-fire stance, never at waist level.
+ // Set the rifle across the upper chest, with its muzzle facing the soldier's forward (-Z) direction.
  bot.heldRifle.position.set(.02,1.28,-.34);
- bot.heldRifle.rotation.set(0,0,0);
+ bot.heldRifle.rotation.set(0,Math.PI,0);
+ // Move the rigged wrist joints onto the rifle grips after the animation mixer runs.
+ const placeJoint=(bone,modelPoint)=>{
+  if(!bone?.parent)return;
+  bot.model.updateMatrixWorld(true);
+  const worldPoint=bot.model.localToWorld(new THREE.Vector3(...modelPoint));
+  bone.position.copy(bone.parent.worldToLocal(worldPoint));
+  bot.model.updateMatrixWorld(true);
+ };
+ placeJoint(bot.rightForeArm,[.34,1.42,-.12]);
+ placeJoint(bot.leftForeArm,[-.34,1.42,-.12]);
+ placeJoint(bot.rightHand,[.14,1.29,-.31]);
+ placeJoint(bot.leftHand,[-.12,1.29,-.57]);
 }
 function setBotAnimation(bot,name){
  if(!bot.actions)return;const next=bot.actions[name]||bot.actions.idle;if(!next||bot.currentAction===next)return;

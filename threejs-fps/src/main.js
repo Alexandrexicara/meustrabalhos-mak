@@ -245,7 +245,16 @@ const mast=new THREE.Mesh(new THREE.CylinderGeometry(.12,.12,.55,10),heliDark);m
 const mainRotor=new THREE.Group();mainRotor.position.y=1.12;for(let i=0;i<4;i++){const blade=new THREE.Mesh(new THREE.BoxGeometry(5.8,.055,.16),heliDark);blade.rotation.y=i*Math.PI/2;mainRotor.add(blade);}patrolAircraft.add(mainRotor);
 for(const side of [-1,1]){const skid=new THREE.Mesh(new THREE.CylinderGeometry(.055,.055,3.5,8),heliDark);skid.rotation.z=Math.PI/2;skid.position.set(0,-.95,side*.72);patrolAircraft.add(skid);const strut=new THREE.Mesh(new THREE.CylinderGeometry(.045,.045,.85,8),heliDark);strut.position.set(.45,-.55,side*.72);patrolAircraft.add(strut);}
 patrolAircraft.scale.set(1.45,1.45,1.45);patrolAircraft.position.set(-48,15,-34);scene.add(patrolAircraft);
-let heliAttack=rand(2.5,4.5);const heliBullets=[];
+let heliAttack=rand(2.5,4.5);const heliBullets=[];const helicopterDebris=[];
+function crashHelicopter(impactPoint){
+ if(helicopterDestroyed)return;helicopterDestroyed=true;const center=new THREE.Vector3();patrolAircraft.getWorldPosition(center);patrolAircraft.updateMatrixWorld(true);
+ const pieces=[];patrolAircraft.traverse(obj=>{if(!obj.isMesh)return;const piece=new THREE.Mesh(obj.geometry.clone(),Array.isArray(obj.material)?obj.material.map(m=>m.clone()):obj.material.clone());obj.getWorldPosition(piece.position);obj.getWorldQuaternion(piece.quaternion);obj.getWorldScale(piece.scale);piece.castShadow=true;piece.receiveShadow=true;pieces.push(piece);});
+ // Keep the aircraft visible through the blast frame, then replace it with its own falling wreckage.
+ for(let i=0;i<pieces.length;i++){const piece=pieces[i];scene.add(piece);const away=piece.position.clone().sub(impactPoint||center);if(away.lengthSq()<.01)away.set(rand(-1,1),.5,rand(-1,1));away.normalize();piece.position.addScaledVector(away,.18);helicopterDebris.push({mesh:piece,velocity:away.multiplyScalar(rand(2.5,8)).add(new THREE.Vector3(rand(-1,1),rand(2,7),rand(-1,1))),spin:new THREE.Vector3(rand(-5,5),rand(-5,5),rand(-5,5)),life:18,bounced:false});}
+ patrolAircraft.visible=false;for(const b of heliBullets){scene.remove(b.mesh);}heliBullets.length=0;
+ const fire=new THREE.PointLight(0xff6b24,11,26);fire.position.copy(impactPoint||center);scene.add(fire);explosions.push({mesh:new THREE.Mesh(new THREE.SphereGeometry(2.2,16,12),new THREE.MeshBasicMaterial({color:0xff7b28,transparent:true,opacity:.88,depthWrite:false,blending:THREE.AdditiveBlending})),age:0});explosions[explosions.length-1].mesh.position.copy(impactPoint||center);setTimeout(()=>scene.remove(fire),900);
+}
+function updateHelicopterDebris(dt){for(let i=helicopterDebris.length-1;i>=0;i--){const p=helicopterDebris[i];p.velocity.y-=9.8*dt;p.mesh.position.addScaledVector(p.velocity,dt);p.mesh.rotation.x+=p.spin.x*dt;p.mesh.rotation.y+=p.spin.y*dt;p.mesh.rotation.z+=p.spin.z*dt;if(p.mesh.position.y<.12){p.mesh.position.y=.12;if(!p.bounced){p.velocity.y=Math.abs(p.velocity.y)*.22;p.velocity.x*=.55;p.velocity.z*=.55;p.bounced=true;}else{p.velocity.y=0;p.velocity.x*=Math.max(0,1-dt*2);p.velocity.z*=Math.max(0,1-dt*2);p.spin.multiplyScalar(Math.max(0,1-dt*1.8));}}p.life-=dt;if(p.life<=0){scene.remove(p.mesh);p.mesh.geometry.dispose();if(Array.isArray(p.mesh.material))p.mesh.material.forEach(m=>m.dispose());else p.mesh.material.dispose();helicopterDebris.splice(i,1);}}}
 
 const weapon = new THREE.Group(); camera.add(weapon); scene.add(camera);
 
@@ -358,7 +367,7 @@ function updateRocketProjectiles(dt){
   p.mesh.position.add(step);p.life-=dt;raycaster.set(previous,step.clone().normalize());raycaster.far=distance+1.2;
   if(!helicopterDestroyed&&patrolAircraft.visible){
    const heliHit=raycaster.intersectObject(patrolAircraft,true).find(h=>h.object.visible);
-   if(heliHit&&heliHit.point.distanceTo(previous)<=distance+1.1){helicopterDestroyed=true;patrolAircraft.visible=false;for(const b of heliBullets)scene.remove(b.mesh);heliBullets.length=0;detonateRocket(p,heliHit.point);rocketProjectiles.splice(i,1);toast('HELICÓPTERO DERRUBADO // ALVO DESTRUÍDO');continue;}
+   if(heliHit&&heliHit.point.distanceTo(previous)<=distance+1.1){crashHelicopter(heliHit.point);detonateRocket(p,heliHit.point);rocketProjectiles.splice(i,1);toast('HELICÓPTERO DERRUBADO // ALVO DESTRUÍDO');continue;}
   }
   raycaster.set(previous,step.clone().normalize());raycaster.far=distance;
   const obstacle=raycaster.intersectObjects(world.children,true).find(h=>h.object.isMesh&&h.object.visible);
@@ -416,7 +425,7 @@ const isTouchDevice=window.matchMedia('(pointer: coarse)').matches||navigator.ma
 let mobileFiring=false;
 const $=id=>document.getElementById(id);
 const startScreen=$('start-screen'),pauseScreen=$('pause-screen'),roundScreen=$('round-screen'),gameoverScreen=$('gameover-screen');
-const mapBounds=36;const supplyPickups=[];const roofTopHeight=4.6;let onRooftop=false;const ladderPosition={x:6.95,z:-17};
+const mapBounds=36;const supplyPickups=[];const roofTopHeight=4.6;let onRooftop=false;const ladderPosition={x:6.95,z:-17};const ladderClimb={active:false,direction:'up',time:0,duration:3.8,start:new THREE.Vector3(),end:new THREE.Vector3()};const roofBounds={minX:-6.35,maxX:6.35,minZ:-22.35,maxZ:-11.65};
 function rand(min,max){return min+Math.random()*(max-min)}
 function toast(message){$('toast').textContent=message;$('toast').classList.add('show');clearTimeout(toastTimeout);toastTimeout=setTimeout(()=>$('toast').classList.remove('show'),1700)}
 let audioCtx=null,masterGain=null,ambientStarted=false,lastStepSound=0;
@@ -645,7 +654,7 @@ function updateAllies(dt){
 }
 
 function spawnWave(){
- onRooftop=false;helicopterDestroyed=false;patrolAircraft.visible=true;routeActive=false;if(routeMarker){world.remove(routeMarker);routeMarker=null;}buildMap(player.round);spawnSupplyPickups();for(const b of bots)scene.remove(b.group);bots.length=0;for(const a of allies)scene.remove(a.group);allies.length=0;
+ onRooftop=false;ladderClimb.active=false;helicopterDestroyed=false;for(const part of helicopterDebris){scene.remove(part.mesh);part.mesh.geometry.dispose();if(Array.isArray(part.mesh.material))part.mesh.material.forEach(m=>m.dispose());else part.mesh.material.dispose();}helicopterDebris.length=0;patrolAircraft.visible=true;routeActive=false;if(routeMarker){world.remove(routeMarker);routeMarker=null;}buildMap(player.round);spawnSupplyPickups();for(const b of bots)scene.remove(b.group);bots.length=0;for(const a of allies)scene.remove(a.group);allies.length=0;
  const count=Math.min(18+(player.round-1)*4,40);for(let i=0;i<count;i++){const bot=makeBot(i);if(i<4){const roofSpots=[[-4.2,-19.2],[4.2,-19.2],[-2.7,-13.8],[2.7,-13.8]];bot.group.position.set(roofSpots[i][0],roofTopHeight,roofSpots[i][1]);}}spawnAllies();
  $('wave').textContent=String(count).padStart(2,'0');$('radar-count').textContent=String(count).padStart(2,'0');
  $('round-label').textContent='ROUND '+String(player.round).padStart(2,'0');
@@ -792,6 +801,25 @@ function releaseGrenadeFromLeftHand(){
  const velocity=direction.multiplyScalar(12).add(new THREE.Vector3(0,5.5,0));
  // The throw begins at the left glove, not at the camera center.
  grenades.push({mesh:grenade,velocity,fuse:2.15,bounced:false});
+}
+function updateLadderClimb(dt){
+ if(!ladderClimb.active)return false;
+ ladderClimb.time=Math.min(ladderClimb.duration,ladderClimb.time+dt);const t=ladderClimb.time/ladderClimb.duration,ease=t*t*(3-2*t);
+ camera.position.lerpVectors(ladderClimb.start,ladderClimb.end,ease);camera.rotation.x=THREE.MathUtils.lerp(camera.rotation.x,ladderClimb.direction==='up'?.12:-.12,.12);
+ // Alternating reach-and-pull hand motion, visible in the first-person arms.
+ const cycle=ladderClimb.time*4.1,reach=Math.sin(cycle),pull=Math.cos(cycle);
+ rightArmRig.rotation.set(-.92+reach*.22,0,-.28+Math.max(0,pull)*.22);
+ leftArmRig.rotation.set(-.92-reach*.22,0,.28-Math.max(0,pull)*.22);
+ weapon.visible=false;operatorLegs.visible=true;operatorLegs.position.y=-.22+Math.sin(cycle*2)*.025;
+ if(t>=1){const up=ladderClimb.direction==='up';ladderClimb.active=false;weapon.visible=true;rightArmRig.rotation.set(0,0,0);leftArmRig.rotation.set(0,0,0);operatorLegs.position.y=0;
+  onRooftop=up;player.onGround=true;player.velocity.y=0;camera.position.copy(ladderClimb.end);camera.rotation.x=0;keys.KeyE=false;keys.Space=false;toast(up?'LAJE ALCANÇADA // ESCADA':'DESCIDA CONCLUÍDA // CHÃO');}
+ return true;
+}
+function beginLadderClimb(direction){
+ ladderClimb.active=true;ladderClimb.direction=direction;ladderClimb.time=0;ladderClimb.duration=3.8;
+ if(direction==='up'){ladderClimb.start.set(ladderPosition.x,1.72,ladderPosition.z-1.05);ladderClimb.end.set(5.85,roofTopHeight+1.72,ladderPosition.z);}
+ else{ladderClimb.start.set(5.85,roofTopHeight+1.72,ladderPosition.z);ladderClimb.end.set(ladderPosition.x,1.72,ladderPosition.z-1.05);}
+ camera.position.copy(ladderClimb.start);player.onGround=false;player.velocity.y=0;keys.KeyE=false;keys.Space=false;toast(direction==='up'?'SUBINDO A ESCADA...':'DESCENDO A ESCADA...');
 }
 function updateFirstPersonRig(dt,crouched){
  const walking=Math.sin(bob*1.7)*.008;
@@ -940,22 +968,33 @@ function updateBots(dt){
 }
 function updateRadar(){const root=$('radar-dots');root.innerHTML='';for(const b of bots){if(!b.alive)continue;const dx=(b.group.position.x-camera.position.x)/55*130,dz=(b.group.position.z-camera.position.z)/55*130;const dot=document.createElement('i');dot.className='radar-dot';dot.style.left='calc(50% + '+THREE.MathUtils.clamp(dx,-62,62)+'px)';dot.style.top='calc(50% + '+THREE.MathUtils.clamp(dz,-62,62)+'px)';root.append(dot);}}
 function update(dt){
- elapsed+=dt;patrolAircraft.position.x=((elapsed*2.2+48)%110)-55;patrolAircraft.position.y=15+Math.sin(elapsed*.55)*.65;patrolAircraft.position.z=-27+Math.sin(elapsed*.24)*7;patrolAircraft.rotation.y=Math.PI+Math.sin(elapsed*.24)*.12;mainRotor.rotation.y+=dt*34;tailRotor.rotation.x+=dt*29;
- heliAttack-=dt;if(heliAttack<=0&&player.active&&player.alive){heliAttack=rand(2.2,3.5);const origin=patrolAircraft.position.clone().add(new THREE.Vector3(1,-.4,0));const target=camera.position.clone().add(new THREE.Vector3(rand(-1.5,1.5),0,rand(-1.5,1.5)));const dir=target.sub(origin).normalize();const bolt=new THREE.Mesh(new THREE.CylinderGeometry(.045,.045,.85,6),new THREE.MeshBasicMaterial({color:0xffb45e,emissive:0xff5522}));bolt.position.copy(origin);bolt.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0),dir);scene.add(bolt);heliBullets.push({mesh:bolt,velocity:dir.multiplyScalar(27),life:2.2});}
+ elapsed+=dt;if(!helicopterDestroyed){patrolAircraft.position.x=((elapsed*2.2+48)%110)-55;patrolAircraft.position.y=15+Math.sin(elapsed*.55)*.65;patrolAircraft.position.z=-27+Math.sin(elapsed*.24)*7;patrolAircraft.rotation.y=Math.PI+Math.sin(elapsed*.24)*.12;mainRotor.rotation.y+=dt*34;tailRotor.rotation.x+=dt*29;}updateHelicopterDebris(dt);
+ heliAttack-=dt;if(!helicopterDestroyed&&heliAttack<=0&&player.active&&player.alive){heliAttack=rand(2.2,3.5);const origin=patrolAircraft.position.clone().add(new THREE.Vector3(1,-.4,0));const target=camera.position.clone().add(new THREE.Vector3(rand(-1.5,1.5),0,rand(-1.5,1.5)));const dir=target.sub(origin).normalize();const bolt=new THREE.Mesh(new THREE.CylinderGeometry(.045,.045,.85,6),new THREE.MeshBasicMaterial({color:0xffb45e,emissive:0xff5522}));bolt.position.copy(origin);bolt.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0),dir);scene.add(bolt);heliBullets.push({mesh:bolt,velocity:dir.multiplyScalar(27),life:2.2});}
  for(let i=heliBullets.length-1;i>=0;i--){const b=heliBullets[i];b.mesh.position.addScaledVector(b.velocity,dt);b.life-=dt;if(b.mesh.position.distanceTo(camera.position)<.65){damagePlayer(10);b.life=-1;}if(b.life<=0){scene.remove(b.mesh);heliBullets.splice(i,1);}}
  updateCombatVehicles(dt);
  updateRocketProjectiles(dt);shotCooldown=Math.max(0,shotCooldown-dt);recoil=Math.max(0,recoil-dt*.55);if(isTouchDevice&&mobileFiring&&player.active)shoot();
  if(player.active&&player.alive){
   if(!routeActive){roundTime-=dt;if(roundTime<=0){roundTime=0;damagePlayer(12);roundTime=12;}updateTimer();}
-  const forward=new THREE.Vector3(0,0,-1).applyQuaternion(camera.quaternion);forward.y=0;forward.normalize();const right=new THREE.Vector3().crossVectors(forward,new THREE.Vector3(0,1,0)).normalize();
-  const move=new THREE.Vector3();if(keys.KeyW)move.add(forward);if(keys.KeyS)move.sub(forward);if(keys.KeyD)move.add(right);if(keys.KeyA)move.sub(right);
-  if(move.lengthSq()>0){if(elapsed-lastStepSound>.38){playSound('step');lastStepSound=elapsed;}move.normalize();const speed=(keys.ShiftLeft||keys.ShiftRight)?8.5:5.2;const nx=camera.position.x+move.x*speed*dt,nz=camera.position.z+move.z*speed*dt;if(!moveBlocked(nx,camera.position.z))camera.position.x=nx;if(!moveBlocked(camera.position.x,nz))camera.position.z=nz;bob+=dt*speed;}
-  const crouched=!!(keys.KeyC||keys.ControlLeft||keys.ControlRight),eyeHeight=onRooftop?roofTopHeight+1.72:(crouched?1.12:1.72);
-  if(player.onGround&&!onRooftop&&Math.hypot(camera.position.x-ladderPosition.x,camera.position.z-ladderPosition.z)<2.45){onRooftop=true;camera.position.set(ladderPosition.x,roofTopHeight+1.72,ladderPosition.z+1.05);player.velocity.y=0;keys.KeyE=false;keys.Space=false;toast('SUBINDO PELA ESCADA // LAJE ALCANÇADA');}else if(keys.KeyE&&onRooftop&&Math.hypot(camera.position.x-ladderPosition.x,camera.position.z-ladderPosition.z)<2.45){onRooftop=false;camera.position.set(ladderPosition.x+.35,1.72,ladderPosition.z+1.05);keys.KeyE=false;toast('DESCENDO PELA ESCADA');}if(keys.Space&&player.onGround&&!onRooftop){player.velocity.y=5.1;player.onGround=false;}player.velocity.y-=14*dt;
-  if(player.onGround){camera.position.y=THREE.MathUtils.damp(camera.position.y,eyeHeight,18,dt);if(Math.abs(camera.position.y-eyeHeight)<.015)camera.position.y=eyeHeight;}
-  else{camera.position.y+=player.velocity.y*dt;if(camera.position.y<=eyeHeight){camera.position.y=eyeHeight;player.velocity.y=0;player.onGround=true;}}
-  weapon.position.y=Math.sin(bob*1.7)*.012-recoil*.5+(crouched?-.22:0);weapon.position.x=Math.cos(bob*.85)*.008;weapon.rotation.x=-recoil+(crouched?.035:0);operatorLegs.visible=camera.rotation.x<-.10;operatorLegs.position.y=crouched?-.12:0;updateFirstPersonRig(dt,crouched);
-  const nearLadder=Math.hypot(camera.position.x-ladderPosition.x,camera.position.z-ladderPosition.z)<2.8;if(keys.KeyE&&!nearLadder)keys.KeyE=false;if(isTouchDevice){const lb=$('mobile-ladder');if(lb){lb.style.display=nearLadder?'block':'none';lb.textContent=onRooftop?'DESCER ESCADA':'SUBIR ESCADA';}}updateBots(dt);updateAllies(dt);updateProjectiles(dt);for(const p of supplyPickups){p.phase+=dt*1.8;p.icon.position.y=p.baseY+Math.sin(p.phase)*.09;p.label.position.y=.72+Math.sin(p.phase)*.09;}collectSupplyPickups();updateMission(dt);updateCampaignRoute(dt);
+  const crouched=!!(keys.KeyC||keys.ControlLeft||keys.ControlRight);
+  if(ladderClimb.active){updateLadderClimb(dt);}
+  else{
+   const forward=new THREE.Vector3(0,0,-1).applyQuaternion(camera.quaternion);forward.y=0;forward.normalize();const right=new THREE.Vector3().crossVectors(forward,new THREE.Vector3(0,1,0)).normalize();
+   const move=new THREE.Vector3();if(keys.KeyW)move.add(forward);if(keys.KeyS)move.sub(forward);if(keys.KeyD)move.add(right);if(keys.KeyA)move.sub(right);
+   if(move.lengthSq()>0){if(elapsed-lastStepSound>.38){playSound('step');lastStepSound=elapsed;}move.normalize();const speed=(keys.ShiftLeft||keys.ShiftRight)?8.5:5.2;const nx=camera.position.x+move.x*speed*dt,nz=camera.position.z+move.z*speed*dt;
+    if(onRooftop){const leavesRoof=nx<roofBounds.minX||nx>roofBounds.maxX||nz<roofBounds.minZ||nz>roofBounds.maxZ;if(leavesRoof){camera.position.x=nx;camera.position.z=nz;onRooftop=false;player.onGround=false;player.velocity.y=-.7;toast('SAINDO DA LAJE // QUEDA');}else{if(!moveBlocked(nx,camera.position.z))camera.position.x=nx;if(!moveBlocked(camera.position.x,nz))camera.position.z=nz;}}
+    else{if(!moveBlocked(nx,camera.position.z))camera.position.x=nx;if(!moveBlocked(camera.position.x,nz))camera.position.z=nz;}bob+=dt*speed;}
+   const nearLadderGround=Math.hypot(camera.position.x-ladderPosition.x,camera.position.z-(ladderPosition.z-1.05))<2.25;
+   const nearLadderRoof=onRooftop&&Math.hypot(camera.position.x-5.85,camera.position.z-ladderPosition.z)<2.1;
+   if(player.onGround&&!onRooftop&&nearLadderGround)beginLadderClimb('up');
+   else if(keys.KeyE&&nearLadderRoof)beginLadderClimb('down');
+   if(keys.Space&&player.onGround&&!onRooftop){player.velocity.y=5.1;player.onGround=false;}
+   if(!ladderClimb.active){const eyeHeight=onRooftop?roofTopHeight+1.72:(crouched?1.12:1.72);player.velocity.y-=14*dt;
+    if(player.onGround){camera.position.y=THREE.MathUtils.damp(camera.position.y,eyeHeight,18,dt);if(Math.abs(camera.position.y-eyeHeight)<.015)camera.position.y=eyeHeight;}
+    else{camera.position.y+=player.velocity.y*dt;if(camera.position.y<=eyeHeight){camera.position.y=eyeHeight;player.velocity.y=0;player.onGround=true;}}
+   }
+  }
+  weapon.position.y=Math.sin(bob*1.7)*.012-recoil*.5+(crouched?-.22:0);weapon.position.x=Math.cos(bob*.85)*.008;weapon.rotation.x=-recoil+(crouched?.035:0);operatorLegs.visible=camera.rotation.x<-.10||ladderClimb.active;operatorLegs.position.y=crouched?-.12:0;if(!ladderClimb.active)updateFirstPersonRig(dt,crouched);
+  const nearLadder=onRooftop?Math.hypot(camera.position.x-5.85,camera.position.z-ladderPosition.z)<2.5:Math.hypot(camera.position.x-ladderPosition.x,camera.position.z-(ladderPosition.z-1.05))<2.5;if(keys.KeyE&&!nearLadder)keys.KeyE=false;if(isTouchDevice){const lb=$('mobile-ladder');if(lb){lb.style.display=ladderClimb.active?'block':nearLadder?'block':'none';lb.textContent=ladderClimb.active?(ladderClimb.direction==='up'?'SUBINDO...':'DESCENDO...'):onRooftop?'DESCER ESCADA':'SUBIR ESCADA';}}updateBots(dt);updateAllies(dt);updateProjectiles(dt);for(const p of supplyPickups){p.phase+=dt*1.8;p.icon.position.y=p.baseY+Math.sin(p.phase)*.09;p.label.position.y=.72+Math.sin(p.phase)*.09;}collectSupplyPickups();updateMission(dt);updateCampaignRoute(dt);
   if(Math.floor(elapsed*3)%2===0)updateRadar();
  }
  $('clock').textContent=String(Math.floor(elapsed/60)).padStart(2,'0')+':'+String(Math.floor(elapsed%60)).padStart(2,'0');

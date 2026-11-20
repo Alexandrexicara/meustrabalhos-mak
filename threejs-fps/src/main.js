@@ -821,9 +821,10 @@ function updateLadderClimb(dt){
  leftArmRig.rotation.set(-.92-reach*.22,0,.28-Math.max(0,pull)*.22);
  weapon.visible=false;operatorLegs.visible=true;operatorLegs.position.y=-.22+Math.sin(cycle*2)*.025;
  if(t>=1){const up=ladderClimb.direction==='up';ladderClimb.active=false;weapon.visible=true;rightArmRig.rotation.set(0,0,0);leftArmRig.rotation.set(0,0,0);operatorLegs.position.y=0;
-  onRooftop=up;player.onGround=true;player.velocity.y=0;camera.position.copy(ladderClimb.end);camera.rotation.x=0;keys.KeyE=false;keys.Space=false;toast(up?'LAJE ALCANÇADA // ESCADA':'DESCIDA CONCLUÍDA // CHÃO');}
+  onRooftop=up;player.onGround=true;player.velocity.y=0;camera.position.copy(ladderClimb.end);camera.rotation.x=0;keys.KeyE=false;keys.Space=false;toast(ladderClimb.direction==='tank'?'TANQUE ALCANÇADO':up?'LAJE ALCANÇADA // ESCADA':'DESCIDA CONCLUÍDA // CHÃO');}
  return true;
 }
+function beginTankClimb(v){ladderClimb.active=true;ladderClimb.direction='tank';ladderClimb.time=0;ladderClimb.duration=2.4;const d=new THREE.Vector3(camera.position.x-v.tank.position.x,0,camera.position.z-v.tank.position.z).normalize();ladderClimb.start.copy(camera.position);ladderClimb.end.set(v.tank.position.x+d.x*.7,4.05,v.tank.position.z+d.z*.7);camera.position.copy(ladderClimb.start);player.onGround=false;player.velocity.y=0;keys.KeyE=false;toast('SUBINDO NO TANQUE...');}
 function beginLadderClimb(direction){
  ladderClimb.active=true;ladderClimb.direction=direction;ladderClimb.time=0;ladderClimb.duration=3.8;
  if(direction==='up'){ladderClimb.start.set(ladderPosition.x,1.72,ladderPosition.z-1.05);ladderClimb.end.set(5.85,roofTopHeight+1.72,ladderPosition.z);}
@@ -1007,6 +1008,7 @@ function update(dt){
    const nearLadderRoof=onRooftop&&Math.hypot(camera.position.x-5.85,camera.position.z-ladderPosition.z)<2.1;
    if(player.onGround&&!onRooftop&&nearLadderGround)beginLadderClimb('up');
    else if(keys.KeyE&&nearLadderRoof)beginLadderClimb('down');
+    else if(keys.KeyE&&!onRooftop){const tank=combatVehicles.find(v=>Math.hypot(camera.position.x-v.tank.position.x,camera.position.z-v.tank.position.z)<4.4);if(tank)beginTankClimb(tank);}
    if(keys.Space&&player.onGround&&!onRooftop){player.velocity.y=5.1;player.onGround=false;}
    if(!ladderClimb.active){const eyeHeight=onRooftop?roofTopHeight+1.72:(crouched?1.12:1.72);player.velocity.y-=14*dt;
     if(player.onGround){camera.position.y=THREE.MathUtils.damp(camera.position.y,eyeHeight,18,dt);if(Math.abs(camera.position.y-eyeHeight)<.015)camera.position.y=eyeHeight;}
@@ -1014,7 +1016,7 @@ function update(dt){
    }
   }
   weapon.position.y=Math.sin(bob*1.7)*.012-recoil*.5+(crouched?-.22:0);weapon.position.x=Math.cos(bob*.85)*.008;weapon.rotation.x=-recoil+(crouched?.035:0);operatorLegs.visible=camera.rotation.x<-.10||ladderClimb.active;operatorLegs.position.y=crouched?-.12:0;if(!ladderClimb.active)updateFirstPersonRig(dt,crouched);
-  const nearLadder=onRooftop?Math.hypot(camera.position.x-5.85,camera.position.z-ladderPosition.z)<2.5:Math.hypot(camera.position.x-ladderPosition.x,camera.position.z-(ladderPosition.z-1.05))<2.5;if(keys.KeyE&&!nearLadder)keys.KeyE=false;if(isTouchDevice){const lb=$('mobile-ladder');if(lb){lb.style.display=ladderClimb.active?'block':nearLadder?'block':'none';lb.textContent=ladderClimb.active?(ladderClimb.direction==='up'?'SUBINDO...':'DESCENDO...'):onRooftop?'DESCER ESCADA':'SUBIR ESCADA';}}updateAutomaticWeapon();updateBots(dt);updateAllies(dt);updateProjectiles(dt);for(const p of supplyPickups){p.phase+=dt*1.8;p.icon.position.y=p.baseY+Math.sin(p.phase)*.09;p.label.position.y=.72+Math.sin(p.phase)*.09;}collectSupplyPickups();updateMission(dt);updateCampaignRoute(dt);
+  const nearTank=!onRooftop&&combatVehicles.some(v=>Math.hypot(camera.position.x-v.tank.position.x,camera.position.z-v.tank.position.z)<4.4);const nearLadder=onRooftop?Math.hypot(camera.position.x-5.85,camera.position.z-ladderPosition.z)<3.2:Math.hypot(camera.position.x-ladderPosition.x,camera.position.z-(ladderPosition.z-1.05))<3.5;if(keys.KeyE&&!nearLadder&&!nearTank)keys.KeyE=false;if(isTouchDevice){const lb=$('mobile-ladder');if(lb){lb.style.display=ladderClimb.active?'block':nearLadder||nearTank?'block':'none';lb.textContent=ladderClimb.active?(ladderClimb.direction==='up'?'SUBINDO...':ladderClimb.direction==='tank'?'SUBINDO NO TANQUE...':'DESCENDO...'):nearTank?'SUBIR NO TANQUE':onRooftop?'DESCER ESCADA':'SUBIR ESCADA';}}updateAutomaticWeapon();updateBots(dt);updateAllies(dt);updateProjectiles(dt);for(const p of supplyPickups){p.phase+=dt*1.8;p.icon.position.y=p.baseY+Math.sin(p.phase)*.09;p.label.position.y=.72+Math.sin(p.phase)*.09;}collectSupplyPickups();updateMission(dt);updateCampaignRoute(dt);
   if(Math.floor(elapsed*3)%2===0)updateRadar();
  }
  $('clock').textContent=String(Math.floor(elapsed/60)).padStart(2,'0')+':'+String(Math.floor(elapsed%60)).padStart(2,'0');

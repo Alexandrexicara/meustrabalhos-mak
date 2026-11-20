@@ -54,7 +54,7 @@ const world=new THREE.Group();scene.add(world);
 const colliders=[];const destructibleCrates=[];const crateDebris=[];
 function box(x,y,z,sx,sy,sz,material,collide=true){
  const m=new THREE.Mesh(new THREE.BoxGeometry(sx,sy,sz),material);m.position.set(x,y,z);m.castShadow=true;m.receiveShadow=true;world.add(m);
- if(collide)colliders.push({x,z,hx:sx/2,hz:sz/2,top:y+sy/2});return m;
+ if(collide)colliders.push({x,z,hx:sx/2,hz:sz/2,top:y+sy/2,bottom:y-sy/2});return m;
 }
 function building(x,z,w,d,h,material=concrete){
  // House-like silhouette: walls, pitched roof, door, window frames and visible glass.
@@ -79,7 +79,7 @@ function addCrate(x,z,size=1.35){
  for(let k=-1;k<=1;k++){add(new THREE.BoxGeometry(.075,size*.9,.055),edge,[k*size*.29,size*.48,-size*.505]);add(new THREE.BoxGeometry(size*.9,size*.9,.055),edge,[0,size*.48,k*size*.29]);}
  const brace=add(new THREE.BoxGeometry(size*.82,.09,.06),edge,[0,size*.48,-size*.54]);brace.rotation.z=.62;
  world.add(group);
- const collider={x,z,hx:size*.58,hz:size*.58,top:size*.96,crate:group};colliders.push(collider);
+ const collider={x,z,hx:size*.58,hz:size*.58,top:size*.96,bottom:0,crate:group};colliders.push(collider);
  const record={group,collider,x,z,size,health:100,maxHealth:100,alive:true,marks:[]};group.userData.destructible=record;destructibleCrates.push(record);return group;
 }
 function markCrateImpact(crate,point,normal){
@@ -116,7 +116,7 @@ function addTank(x,z){
  crewHitbox.name='tank-crew-damage-hitbox';crewHitbox.position.set(0,1.08,0);crewHitbox.userData.crewHitbox=true;crew.group.add(crewHitbox);crew.hitbox=crewHitbox;
  if(soldierTemplate)attachSoldier(crew);
  tank.position.set(x,0,z);tank.rotation.y=Math.PI;world.add(tank);
- const collider={x,z,hx:2.55,hz:1.85,top:2.1};colliders.push(collider);
+ const collider={x,z,hx:2.55,hz:1.85,top:2.1,bottom:0};colliders.push(collider);
  combatVehicles.push({tank,turret,barrel,wheels,crew,collider,center:new THREE.Vector3(x,0,z),phase:Math.random()*Math.PI*2,cannonCooldown:rand(2.5,4.5),fire:rand(2,4)});
 }
 function createSurfaceImpact(point,normal){
@@ -617,7 +617,7 @@ function spawnAllies(){
 }
 function updateAllies(dt){
  for(let i=0;i<allies.length;i++){
-  const a=allies[i];if(!a.alive){if(a.dying){a.deathAge+=dt;const t=Math.min(1,a.deathAge/.48);a.group.rotation.z=a.deathSide*1.48*t;a.group.position.y=a.deathStartY-.78*t;if(t>=1){a.dying=false;a.corpse=true;}}continue;}
+  const a=allies[i];if(!a.alive){if(a.dying){a.deathAge+=dt;const t=Math.min(1,a.deathAge/.48);a.group.rotation.z=a.deathSide*1.48*t;a.group.position.y=a.deathStartY;if(t>=1){a.dying=false;a.corpse=true;}}continue;}
   if(a.mixer)a.mixer.update(dt);
   updateHeldRifle(a);
   const angle=camera.rotation.y,offset=[[-2.8,0.9],[2.8,0.9],[-2.8,-1.3],[2.8,-1.3]][i];
@@ -723,13 +723,13 @@ function updateHUD(){
 }
 function moveBlocked(x,z){
  if(Math.abs(x)>mapBounds||Math.abs(z)>mapBounds)return true;
- // Keep a clear ground-level approach lane beside the east wall of the rooftop.
- // The roof slab used to block the player before the ladder trigger could engage.
- const ladderApproach=x>ladderPosition.x-.58&&x<ladderPosition.x+1.75&&z>ladderPosition.z-3.15&&z<ladderPosition.z+3.15;
+ // Collision is evaluated in 3D: a rooftop slab blocks the player only while
+ // the player's body overlaps its vertical range. This prevents the roof from
+ // acting like an invisible wall after the player has climbed down or fallen.
+ const playerFeet=camera.position.y-1.55,playerHead=camera.position.y+.16;
  return colliders.some(c=>{
-  const isLadderRoof=c.top>roofTopHeight-.05&&Math.abs(c.x)<.01&&Math.abs(c.z+17)<.01;
-  if(ladderApproach&&isLadderRoof)return false;
-  return Math.abs(x-c.x)<c.hx+.42&&Math.abs(z-c.z)<c.hz+.42&&(!onRooftop||camera.position.y<roofTopHeight+1.0);
+  const verticalOverlap=playerFeet<(c.top??Infinity)-.02&&playerHead>(c.bottom??0)+.02;
+  return verticalOverlap&&Math.abs(x-c.x)<c.hx+.42&&Math.abs(z-c.z)<c.hz+.42;
  });
 }
 function damagePlayer(amount){if(!player.alive)return;playSound('damage');player.health=Math.max(0,player.health-amount);$('damage-flash').classList.add('show');setTimeout(()=>$('damage-flash').classList.remove('show'),100);updateHUD();if(player.health<=0){player.alive=false;player.active=false;document.exitPointerLock?.();$('gameover-copy').textContent='You neutralized '+player.kills+' hostiles across '+player.round+' rounds.';gameoverScreen.classList.remove('hidden');}}
@@ -958,7 +958,7 @@ function chooseCover(bot){
 function updateBots(dt){
  for(let i=0;i<bots.length;i++){
   const b=bots[i];
-  if(b.dying){b.deathAge+=dt;const t=Math.min(1,b.deathAge/.48);b.group.rotation.z=b.deathSide*1.48*t;b.group.position.y=b.deathStartY-.78*t;if(t>=1){b.dying=false;b.corpse=true;}continue;}
+  if(b.dying){b.deathAge+=dt;const t=Math.min(1,b.deathAge/.48);b.group.rotation.z=b.deathSide*1.48*t;b.group.position.y=b.deathStartY;if(t>=1){b.dying=false;b.corpse=true;}continue;}
   if(!b.alive)continue;
   if(b.mixer)b.mixer.update(dt);
   updateHeldRifle(b);

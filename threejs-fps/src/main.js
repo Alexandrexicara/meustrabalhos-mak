@@ -432,38 +432,44 @@ const soldierLoader=new GLTFLoader();
 soldierLoader.load('https://threejs.org/examples/models/gltf/Soldier.glb',gltf=>{
  soldierTemplate=gltf.scene;soldierClips=gltf.animations||[];
  for(const bot of bots)attachSoldier(bot);
+ for(const ally of allies)attachSoldier(ally);
 },undefined,error=>console.warn('Soldier model unavailable; using local fallback:',error));
 function attachSoldier(bot){
- // Friendly operators keep the purpose-built blue/green/black model: its arms are posed around the rifle. The GLB idle animation lowers its arms and obscures the weapon grip.
- if(bot.ally)return;
  if(!soldierTemplate||!bot.alive)return;
  const old=bot.group.getObjectByName('fallback-body');if(old)bot.group.remove(old);
  const model=cloneSkeleton(soldierTemplate);model.name='rigged-soldier';model.scale.setScalar(1.0);model.position.y=0;
  // Soldier.glb already faces -Z, the same forward direction as the player.
  model.rotation.y=0;
- let allyMaterialSlot=0;
+ model.updateMatrixWorld(true);
  model.traverse(o=>{if(!o.isMesh)return;o.castShadow=true;o.receiveShadow=true;if(!o.material)return;
   const paintAlly=material=>{const m=material.clone();if(bot.ally&&m.color){
-   const tag=((o.name||'')+' '+(m.name||'')).toLowerCase(),c=material.color;
-   const r=c.r,g=c.g,b=c.b,skinLike=/skin|face|head|eye|hand/i.test(tag)||(r>g*1.16&&g>b*1.08&&r>.28&&g>.12);
-   const brightness=Math.max(r,g,b);
-   if(!skinLike){if(brightness<.22)m.color.setHex(0x080b0e);else{m.color.setHex(allyMaterialSlot%2===0?0x236bd1:0x36a66a);allyMaterialSlot++;}}
-  }m.needsUpdate=true;return m;};
+   const tag=((o.name||'')+' '+(material.name||'')).toLowerCase();
+   const worldBox=new THREE.Box3().setFromObject(o),center=worldBox.getCenter(new THREE.Vector3());
+   const skinLike=/skin|face|head|eye|hand/i.test(tag)||center.y>1.53;
+   if(!skinLike){
+    if(/vest|armor|armour|chest|plate|pack|pouch/i.test(tag))m.color.setHex(0x36a66a);
+    else if(/helmet|boot|shoe|glove|belt|weapon|rifle|gun|gear/i.test(tag)||center.y<.25)m.color.setHex(0x080b0e);
+    else m.color.setHex(0x236bd1);
+   }
+   m.needsUpdate=true;
+  }return m;};
   o.material=Array.isArray(o.material)?o.material.map(paintAlly):paintAlly(o.material);
  });
  bot.group.add(model);bot.model=model;
- // Attach a visible rifle to the soldier's hands; barrel points along the soldier's forward axis (+Z).
- const heldRifle=new THREE.Group();heldRifle.name='held-rifle';
- // Counter-rotate the attached rifle so its muzzle still points forward after the soldier correction.
- heldRifle.position.set(-.02,1.43,-.34);heldRifle.rotation.y=Math.PI;model.add(heldRifle);
- const rifleMetal=mat(0x20282a,.36,.7),riflePoly=mat(0x343b35,.8,.05);
- const receiver=new THREE.Mesh(new THREE.BoxGeometry(.13,.14,.43),rifleMetal);heldRifle.add(receiver);
- const handguard=new THREE.Mesh(new THREE.BoxGeometry(.105,.105,.32),riflePoly);handguard.position.z=.31;heldRifle.add(handguard);
- const barrel=new THREE.Mesh(new THREE.CylinderGeometry(.022,.022,.5,12),rifleMetal);barrel.rotation.x=Math.PI/2;barrel.position.z=.69;heldRifle.add(barrel);
- const stock=new THREE.Mesh(new THREE.BoxGeometry(.1,.12,.25),riflePoly);stock.position.z=-.31;heldRifle.add(stock);
- const magazine=new THREE.Mesh(new THREE.BoxGeometry(.09,.24,.13),rifleMetal);magazine.position.set(0,-.17,.1);heldRifle.add(magazine);
- heldRifle.traverse(o=>{if(o.isMesh){o.castShadow=true;o.receiveShadow=true;}});
- bot.heldRifle=heldRifle;
+ // The rigged Soldier.glb carries the friendly operator's weapon and authored hand pose.
+ // Avoid adding the old block-built placeholder rifle to allied 3D characters.
+ if(!bot.ally){
+  const heldRifle=new THREE.Group();heldRifle.name='held-rifle';
+  heldRifle.position.set(-.02,1.43,-.34);heldRifle.rotation.y=Math.PI;model.add(heldRifle);
+  const rifleMetal=mat(0x20282a,.36,.7),riflePoly=mat(0x343b35,.8,.05);
+  const receiver=new THREE.Mesh(new THREE.BoxGeometry(.13,.14,.43),rifleMetal);heldRifle.add(receiver);
+  const handguard=new THREE.Mesh(new THREE.BoxGeometry(.105,.105,.32),riflePoly);handguard.position.z=.31;heldRifle.add(handguard);
+  const barrel=new THREE.Mesh(new THREE.CylinderGeometry(.022,.022,.5,12),rifleMetal);barrel.rotation.x=Math.PI/2;barrel.position.z=.69;heldRifle.add(barrel);
+  const stock=new THREE.Mesh(new THREE.BoxGeometry(.1,.12,.25),riflePoly);stock.position.z=-.31;heldRifle.add(stock);
+  const magazine=new THREE.Mesh(new THREE.BoxGeometry(.09,.24,.13),rifleMetal);magazine.position.set(0,-.17,.1);heldRifle.add(magazine);
+  heldRifle.traverse(o=>{if(o.isMesh){o.castShadow=true;o.receiveShadow=true;}});
+  bot.heldRifle=heldRifle;
+ }
  // Preserve the original Soldier.glb rig and its animated arms; do not add duplicate geometry.
  bot.mixer=new THREE.AnimationMixer(model);
  const idle=soldierClips.find(c=>/idle/i.test(c.name))||soldierClips[0];

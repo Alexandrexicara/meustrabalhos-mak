@@ -437,9 +437,8 @@ function attachSoldier(bot){
  if(!soldierTemplate||!bot.alive)return;
  const old=bot.group.getObjectByName('fallback-body');if(old)bot.group.remove(old);
  const model=cloneSkeleton(soldierTemplate);model.name='rigged-soldier';model.scale.setScalar(1.0);model.position.y=0;
- // Soldier.glb's authored forward axis is -Z; turn the character so its chest,
- // face and locomotion point along the squad group's +Z travel direction.
- model.rotation.y=Math.PI;
+ // Soldier.glb already faces -Z, the same forward direction as the player.
+ model.rotation.y=0;
  model.traverse(o=>{if(o.isMesh){o.castShadow=true;o.receiveShadow=true;if(o.material)o.material=o.material.clone();}});
  bot.group.add(model);bot.model=model;
  // Attach a visible rifle to the soldier's hands; barrel points along the soldier's forward axis (+Z).
@@ -516,7 +515,8 @@ function makeBot(index){
 
 function spawnAllies(){
  // Four friendly AI soldiers are separate from the hostile wave and never count as enemies.
- const offsets=[[-2.4,3.1],[2.4,3.1],[-4.1,5.2],[4.1,5.2]];
+ // Two allies flank each side, staggered slightly so they move alongside the player.
+ const offsets=[[-2.8,0.9],[2.8,0.9],[-2.8,-1.3],[2.8,-1.3]];
  for(let i=0;i<4;i++){
   const ally=makeBot(60+i);bots.pop();ally.ally=true;ally.health=180;ally.maxHealth=180;ally.fire=rand(.4,1.1);ally.alerted=false;ally.group.position.set(camera.position.x+offsets[i][0],0,camera.position.z+offsets[i][1]);ally.group.userData.squadName=['ALPHA-2','BRAVO-2','CHARLIE-2','DELTA-2'][i];allies.push(ally);
  }
@@ -526,17 +526,17 @@ function updateAllies(dt){
  for(let i=0;i<allies.length;i++){
   const a=allies[i];if(!a.alive){if(a.dying){a.deathAge+=dt;const t=Math.min(1,a.deathAge/.48);a.group.rotation.z=a.deathSide*1.48*t;a.group.position.y=a.deathStartY-.78*t;if(t>=1){a.dying=false;a.corpse=true;}}continue;}
   if(a.mixer)a.mixer.update(dt);
-  const angle=camera.rotation.y,offset=[[-2.4,3.1],[2.4,3.1],[-4.1,5.2],[4.1,5.2]][i];
+  const angle=camera.rotation.y,offset=[[-2.8,0.9],[2.8,0.9],[-2.8,-1.3],[2.8,-1.3]][i];
   const desiredX=camera.position.x+offset[0]*Math.cos(angle)+offset[1]*Math.sin(angle);
   const desiredZ=camera.position.z-offset[0]*Math.sin(angle)+offset[1]*Math.cos(angle);
   const dx=desiredX-a.group.position.x,dz=desiredZ-a.group.position.z,dist=Math.hypot(dx,dz);
-  if(dist>1.15){const step=Math.min(dist-1.05,a.speed*1.65*dt);const nx=a.group.position.x+dx/dist*step,nz=a.group.position.z+dz/dist*step;if(!moveBlocked(nx,a.group.position.z))a.group.position.x=nx;if(!moveBlocked(a.group.position.x,nz))a.group.position.z=nz;setBotAnimation(a,'run');}
+  if(dist>1.15){const step=Math.min(dist-1.05,a.speed*1.65*dt);const nx=a.group.position.x+dx/dist*step,nz=a.group.position.z+dz/dist*step;a.group.rotation.y=Math.atan2(-dx,-dz);if(!moveBlocked(nx,a.group.position.z))a.group.position.x=nx;if(!moveBlocked(a.group.position.x,nz))a.group.position.z=nz;setBotAnimation(a,'run');}
   else setBotAnimation(a,'idle');
   let target=null,best=32;
   for(const enemy of bots){if(!enemy.alive)continue;const d=a.group.position.distanceTo(enemy.group.position);if(d<best){best=d;target=enemy;}}
   if(target){
    const aim=target.group.position.clone().add(new THREE.Vector3(0,1.25,0)),origin=a.group.position.clone().add(new THREE.Vector3(0,1.42,0)),delta=aim.clone().sub(origin),distance=delta.length();
-   a.group.rotation.y=Math.atan2(delta.x,delta.z);a.fire-=dt;
+   a.group.rotation.y=Math.atan2(-delta.x,-delta.z);a.fire-=dt;
    if(a.fire<=0&&distance<32){raycaster.set(origin,delta.normalize());raycaster.far=distance;const block=raycaster.intersectObjects(world.children,true).find(hit=>hit.object.isMesh&&hit.object.visible);if(!block||block.distance>distance-.45){a.fire=rand(.72,1.05);damageBot(target,rand(7,11),aim,'ALLY');const end=aim.clone();const geometry=new THREE.BufferGeometry().setFromPoints([origin,end]);const line=new THREE.Line(geometry,new THREE.LineBasicMaterial({color:0x9bffb0,transparent:true,opacity:.8}));scene.add(line);setTimeout(()=>{scene.remove(line);geometry.dispose();line.material.dispose();},90);}}
   }
  }

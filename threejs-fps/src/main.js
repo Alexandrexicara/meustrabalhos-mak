@@ -216,10 +216,10 @@ const weapon = new THREE.Group(); camera.add(weapon); scene.add(camera);
 
 // First-person operator rig: separate shoulder pivots keep both hands aligned with the weapon.
 const operatorBody=new THREE.Group();camera.add(operatorBody);
-const uniformMat=new THREE.MeshStandardMaterial({color:0x48523b,roughness:.94});
-const uniformDark=new THREE.MeshStandardMaterial({color:0x252d27,roughness:.9});
-const gloveMat=new THREE.MeshStandardMaterial({color:0x202522,roughness:.82});
-const seamMat=new THREE.MeshStandardMaterial({color:0x697454,roughness:.9});
+const uniformMat=new THREE.MeshStandardMaterial({color:0x236bd1,roughness:.94});
+const uniformDark=new THREE.MeshStandardMaterial({color:0x111820,roughness:.9});
+const gloveMat=new THREE.MeshStandardMaterial({color:0x080b0e,roughness:.82});
+const seamMat=new THREE.MeshStandardMaterial({color:0x70b4ff,roughness:.9});
 function limbBetween(parent,a,b,radius,material){const av=new THREE.Vector3(...a),bv=new THREE.Vector3(...b),d=bv.clone().sub(av);const mesh=new THREE.Mesh(new THREE.CapsuleGeometry(radius,Math.max(.06,d.length()-radius*2),6,10),material);mesh.position.copy(av.add(bv).multiplyScalar(.5));mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0),d.normalize());mesh.castShadow=true;parent.add(mesh);return mesh;}
 function armSegment(parent,a,b,rTop,rBottom,material){const av=new THREE.Vector3(...a),bv=new THREE.Vector3(...b),d=bv.clone().sub(av);const mesh=new THREE.Mesh(new THREE.CylinderGeometry(rTop,rBottom,d.length(),14,3),material);mesh.position.copy(av.add(bv).multiplyScalar(.5));mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0),d.normalize());mesh.castShadow=true;mesh.receiveShadow=true;parent.add(mesh);return mesh;}
 function gloveHand(parent,x,y,z,scale=1){const hand=new THREE.Group();hand.position.set(x,y,z);hand.scale.setScalar(scale);parent.add(hand);const palm=new THREE.Mesh(new THREE.BoxGeometry(.14,.105,.19),gloveMat);palm.rotation.x=-.18;hand.add(palm);for(let i=0;i<4;i++){const finger=new THREE.Mesh(new THREE.CapsuleGeometry(.021,.075,4,7),gloveMat);finger.position.set(-.047+i*.031,-.018,-.105);finger.rotation.x=-.35;hand.add(finger);}const thumb=new THREE.Mesh(new THREE.CapsuleGeometry(.025,.075,4,7),gloveMat);thumb.position.set(.085,-.005,-.025);thumb.rotation.z=-.85;hand.add(thumb);return hand;}
@@ -439,7 +439,7 @@ function attachSoldier(bot){
  const model=cloneSkeleton(soldierTemplate);model.name='rigged-soldier';model.scale.setScalar(1.0);model.position.y=0;
  // Soldier.glb already faces -Z, the same forward direction as the player.
  model.rotation.y=0;
- model.traverse(o=>{if(o.isMesh){o.castShadow=true;o.receiveShadow=true;if(o.material)o.material=o.material.clone();}});
+ model.traverse(o=>{if(o.isMesh){o.castShadow=true;o.receiveShadow=true;if(o.material){o.material=o.material.clone();const materialName=(o.material.name||'').toLowerCase(),meshName=(o.name||'').toLowerCase();if(!/head|skin|face|hand|eye/.test(materialName+' '+meshName)){o.material.color?.setHex(bot.ally?0x36a66a:0xb84a3f);o.material.needsUpdate=true;}}}});
  bot.group.add(model);bot.model=model;
  // Attach a visible rifle to the soldier's hands; barrel points along the soldier's forward axis (+Z).
  const heldRifle=new THREE.Group();heldRifle.name='held-rifle';
@@ -454,7 +454,7 @@ function attachSoldier(bot){
  heldRifle.traverse(o=>{if(o.isMesh){o.castShadow=true;o.receiveShadow=true;}});
  bot.heldRifle=heldRifle;
  // Overlay both forearms in a true two-hand firing grip, aligned with the stock and handguard.
- const arms=new THREE.Group();arms.name='rifle-grip-arms';model.add(arms);const sleeve=mat(0x59634b),glove=mat(0x292d2a);
+ const arms=new THREE.Group();arms.name='rifle-grip-arms';model.add(arms);const sleeve=mat(bot.ally?0x36a66a:0xb84a3f),glove=mat(0x080b0e);
  const armBetween=(a,b,r=.075)=>{const v=new THREE.Vector3(...b).sub(new THREE.Vector3(...a));const mesh=new THREE.Mesh(new THREE.CapsuleGeometry(r,Math.max(.08,v.length()-.12),5,8),sleeve);mesh.position.set((a[0]+b[0])/2,(a[1]+b[1])/2,(a[2]+b[2])/2);mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0),v.normalize());mesh.castShadow=true;arms.add(mesh);};
  armBetween([-.29,1.43,0],[-.12,1.34,-.57]);armBetween([.29,1.43,0],[.13,1.34,-.39]);
  for(const p of [[-.12,1.34,-.57],[.13,1.34,-.39]]){const hand=new THREE.Mesh(new THREE.SphereGeometry(.085,10,8),glove);hand.position.set(...p);hand.castShadow=true;arms.add(hand);}
@@ -475,7 +475,7 @@ function makeBot(index){
  const group=new THREE.Group();
  // Lightweight local fallback is replaced by the rigged animated GLB as soon as it loads.
  const fallback=new THREE.Group();fallback.name='fallback-body';group.add(fallback);
- const uniform=mat(index%2?0x59684a:0x74664d),vestMat=mat(0x303a34),skin=mat(0x9b8067),dark=mat(0x18201f),cloth=mat(0x343b32);
+ const teamColor=index>=60?0x36a66a:0xb84a3f;const uniform=mat(teamColor),vestMat=mat(0x111820),skin=mat(0x9b8067),dark=mat(0x080b0e),cloth=mat(0x20272d);
  const torso=new THREE.Mesh(new THREE.CapsuleGeometry(.25,.52,6,12),uniform);torso.position.y=1.18;torso.scale.set(1,.95,.72);fallback.add(torso);
  const vest=new THREE.Mesh(new THREE.BoxGeometry(.54,.48,.31),vestMat);vest.position.set(0,1.2,-.025);fallback.add(vest);
  const head=new THREE.Mesh(new THREE.SphereGeometry(.16,16,12),skin);head.position.y=1.69;fallback.add(head);
@@ -496,7 +496,7 @@ function makeBot(index){
  // Both arms reach forward to the weapon: right hand at the pistol grip, left hand under the handguard.
  makeArm([.29,1.43,.02],[.16,1.34,.43]);makeArm([-.29,1.43,.02],[-.13,1.34,.48]);
  const hpbg=new THREE.Mesh(new THREE.PlaneGeometry(.72,.07),new THREE.MeshBasicMaterial({color:0x17211e,side:THREE.DoubleSide}));hpbg.position.y=2.12;hpbg.userData.noHit=true;group.add(hpbg);
- const hp=new THREE.Mesh(new THREE.PlaneGeometry(.68,.045),new THREE.MeshBasicMaterial({color:0xff755e,side:THREE.DoubleSide}));hp.position.set(0,2.12,.006);hp.userData.noHit=true;group.add(hp);
+ const hp=new THREE.Mesh(new THREE.PlaneGeometry(.68,.045),new THREE.MeshBasicMaterial({color:index>=60?0x55e58a:0xff665e,side:THREE.DoubleSide}));hp.position.set(0,2.12,.006);hp.userData.noHit=true;group.add(hp);
  // Spawn around the whole combat perimeter, not in one narrow front cluster.
  let spawn=null,bestCandidate=null,bestGap=-1;
  for(let attempt=0;attempt<1400;attempt++){

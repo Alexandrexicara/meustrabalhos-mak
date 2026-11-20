@@ -100,6 +100,7 @@ function damageCratesInBlast(center,radius,damage){
 }
 const combatVehicles=[];const tankShells=[];const surfaceImpacts=[];
 function getDamageableUnits(){return [...bots.filter(b=>b?.alive),...combatVehicles.flatMap(v=>v.crew).filter(b=>b?.alive)];}
+function getRemainingGroundHostiles(){return getDamageableUnits().length;}
 function addTank(x,z){
  const tank=new THREE.Group(),olive=mat(0x46513b,.82,.25),dark=mat(0x202722,.9,.15),steel=mat(0x343b36,.5,.55);
  const hull=new THREE.Mesh(new THREE.BoxGeometry(4.2,1.05,2.55),olive);hull.position.y=.95;hull.castShadow=true;hull.receiveShadow=true;tank.add(hull);
@@ -111,7 +112,7 @@ function addTank(x,z){
  const barrel=new THREE.Mesh(new THREE.CylinderGeometry(.13,.18,2.65,12),steel);barrel.rotation.z=Math.PI/2;barrel.position.set(1.45,.06,0);turret.add(barrel);
  const muzzle=new THREE.Mesh(new THREE.TorusGeometry(.14,.035,8,16),dark);muzzle.position.set(2.77,.06,0);muzzle.rotation.y=Math.PI/2;turret.add(muzzle);
  const mantlet=new THREE.Mesh(new THREE.SphereGeometry(.28,12,10),olive);mantlet.position.set(.55,.05,0);turret.add(mantlet);
- const crew=[];for(let i=0;i<2;i++){const soldier=makeBot(40+combatVehicles.length*2+i);bots.pop();scene.remove(soldier.group);soldier.ally=false;soldier.hp.visible=false;soldier.hpbg.visible=false;soldier.group.scale.setScalar(.88);soldier.group.position.set(i?.72:-.72,2.12,i?.22:-.22);tank.add(soldier.group);const hitbox=new THREE.Mesh(new THREE.CapsuleGeometry(.72,1.65,8,12),new THREE.MeshBasicMaterial({color:0xffffff,transparent:true,opacity:0,depthWrite:false,colorWrite:false,side:THREE.DoubleSide}));hitbox.position.set(0,1.35,0);hitbox.frustumCulled=false;hitbox.userData.crewHitbox=true;hitbox.userData.damageOwner=soldier;soldier.group.add(hitbox);soldier.hitbox=hitbox;if(soldierTemplate)attachSoldier(soldier);crew.push(soldier);}tank.position.set(x,0,z);tank.rotation.y=Math.PI;world.add(tank);const collider={x,z,hx:2.55,hz:1.85,top:2.1,bottom:0};colliders.push(collider);combatVehicles.push({tank,turret,barrel,wheels,crew,collider,center:new THREE.Vector3(x,0,z),phase:Math.random()*Math.PI*2,cannonCooldown:rand(2.5,4.5),fire:rand(2,4)});
+ const crew=[];for(let i=0;i<2;i++){const soldier=makeBot(40+combatVehicles.length*2+i);bots.pop();scene.remove(soldier.group);soldier.ally=false;soldier.isTankCrew=true;soldier.hp.visible=false;soldier.hpbg.visible=false;soldier.group.scale.setScalar(.88);soldier.group.position.set(i?.72:-.72,2.12,i?.22:-.22);tank.add(soldier.group);const hitbox=new THREE.Mesh(new THREE.CapsuleGeometry(.72,1.65,8,12),new THREE.MeshBasicMaterial({color:0xffffff,transparent:true,opacity:0,depthWrite:false,colorWrite:false,side:THREE.DoubleSide}));hitbox.position.set(0,1.35,0);hitbox.frustumCulled=false;hitbox.userData.crewHitbox=true;hitbox.userData.damageOwner=soldier;soldier.group.add(hitbox);soldier.hitbox=hitbox;if(soldierTemplate)attachSoldier(soldier);crew.push(soldier);}tank.position.set(x,0,z);tank.rotation.y=Math.PI;world.add(tank);const collider={x,z,hx:2.55,hz:1.85,top:2.1,bottom:0};colliders.push(collider);combatVehicles.push({tank,turret,barrel,wheels,crew,collider,center:new THREE.Vector3(x,0,z),phase:Math.random()*Math.PI*2,cannonCooldown:rand(2.5,4.5),fire:rand(2,4)});
 }
 function createSurfaceImpact(point,normal){
  if(!point||!normal||Math.abs(normal.y)>.72)return;
@@ -693,17 +694,16 @@ function updateCampaignRoute(dt){
 }
 function updateMission(dt){
  if(missionDone)return;
- const remaining=bots.filter(b=>b.alive).length;
+ const remaining=getRemainingGroundHostiles();
  if(missionKind==='eliminate'){
   $('objective-sub').textContent=remaining>0?'ELIMINATE HOSTILES // '+remaining+' REMAIN':'ALL HOSTILES ELIMINATED // SECTOR CLEAR';
   if(remaining===0){unlockExitRoute();}
   return;
  }
- if(remaining>0){
-  missionProgress=0;
-  $('objective-sub').textContent='ELIMINATE HOSTILES FIRST // '+remaining+' REMAIN';
-  return;
- }
+ if(remaining===0){$('objective-sub').textContent='ALL GROUND HOSTILES ELIMINATED // SECTOR CLEAR';unlockExitRoute();return;}
+ $('objective-sub').textContent='ELIMINATE GROUND HOSTILES // '+remaining+' REMAIN';
+ missionProgress=0;
+ return;
  const dx=camera.position.x-missionX,dz=camera.position.z-missionZ;
  const distance=Math.hypot(dx,dz),radius=missionKind==='defend'?7.5:3.2,inside=distance<=radius;
  if(inside){missionProgress=Math.min(missionDuration,missionProgress+dt);if(missionMarker)missionMarker.rotation.y+=dt*.7;}
@@ -715,7 +715,7 @@ function updateMission(dt){
 function updateTimer(){const m=Math.floor(roundTime/60),s=Math.floor(roundTime%60);$('round-timer').textContent=String(m).padStart(2,'0')+':'+String(s).padStart(2,'0');}
 function updateHUD(){
  $('health').textContent=Math.max(0,Math.ceil(player.health));$('health-fill').style.width=Math.max(0,player.health)+'%';const loaded=player.weaponType==='pistol'?player.pistolAmmo:player.weaponType==='launcher'?player.rocketAmmo:player.ammo;const spare=player.weaponType==='pistol'?player.pistolReserve:player.weaponType==='launcher'?'ROCKET':player.reserve;$('ammo').textContent=String(loaded).padStart(2,'0');$('reserve').textContent=spare;$('grenade-count').textContent=String(player.grenades);$('kills').textContent=String(player.kills).padStart(2,'0');$('accuracy').textContent=(player.shots?Math.round(player.hits/player.shots*100):100)+'%';
- $('radar-count').textContent=String(bots.filter(b=>b.alive).length).padStart(2,'0');$('wave').textContent=String(bots.filter(b=>b.alive).length).padStart(2,'0');
+ $('radar-count').textContent=String(getRemainingGroundHostiles()).padStart(2,'0');$('wave').textContent=String(getRemainingGroundHostiles()).padStart(2,'0');
  const bars=$('ammo-bars');bars.innerHTML='';const cap=player.weaponType==='pistol'?12:player.weaponType==='launcher'?1:30;const barLoaded=player.weaponType==='pistol'?player.pistolAmmo:player.weaponType==='launcher'?player.rocketAmmo:player.ammo;for(let i=0;i<cap;i++){const el=document.createElement('i');if(i>=barLoaded)el.className='empty';bars.append(el);}
 }
 function moveBlocked(x,z,eyeY=camera.position.y){
@@ -809,7 +809,7 @@ function killBot(bot,source='BULLET'){
 }
 function damageBot(bot,amount,impact,source='BULLET'){
  if(!bot||!bot.alive)return;
- bot.alerted=true;bot.health=Math.max(0,bot.health-amount);bot.hitFlash=.08;
+ bot.alerted=true;const nextHealth=Math.max(0,bot.health-amount);bot.health=bot.isTankCrew&&source!=='FRAG'?Math.max(1,nextHealth):nextHealth;bot.hitFlash=.08;
  bot.hp.scale.x=Math.max(0,bot.health/bot.maxHealth);
  if(impact)spawnBlood(impact);
  if(bot.health<=0)killBot(bot,source);
@@ -913,7 +913,7 @@ function detonateGrenade(g){
  const center=g.mesh.position.clone();scene.remove(g.mesh);playSound('explosion');damageCratesInBlast(center,7,190);
  const flash=new THREE.Mesh(new THREE.SphereGeometry(.5,16,12),new THREE.MeshBasicMaterial({color:0xffa34d,transparent:true,opacity:.82,depthWrite:false}));
  flash.position.copy(center);scene.add(flash);explosions.push({mesh:flash,age:0});
- for(const bot of getDamageableUnits()){const target=bot.group.getWorldPosition(new THREE.Vector3()).add(new THREE.Vector3(0,.85,0));const d=target.distanceTo(center);if(d<9){const damage=Math.max(0,Math.round(190*Math.pow(1-d/9,1.35)));if(damage>0)damageBot(bot,damage,target,'FRAG');}}
+ for(const bot of getDamageableUnits()){const target=bot.group.getWorldPosition(new THREE.Vector3()).add(new THREE.Vector3(0,.85,0));const d=target.distanceTo(center);const tank=bot.isTankCrew?bot.group.parent:null;const tankCenter=tank? tank.getWorldPosition(new THREE.Vector3()):null;const grenadeHitsTank=!!(bot.isTankCrew&&tankCenter&&tankCenter.distanceTo(center)<=9.5);if(grenadeHitsTank){damageBot(bot,999,target,'FRAG');continue;}if(d<9){const damage=Math.max(0,Math.round(190*Math.pow(1-d/9,1.35)));if(damage>0)damageBot(bot,damage,target,'FRAG');}}
  if(camera.position.distanceTo(center)<5.5)damagePlayer(Math.round(30*(1-camera.position.distanceTo(center)/7)));
  updateHUD();
 }
@@ -1049,7 +1049,7 @@ function updateBots(dt){
 }
 function updateRadar(){
  const root=$('radar-dots');root.innerHTML='';
- for(const b of bots){if(!b.alive)continue;const dx=(b.group.position.x-camera.position.x)/55*130,dz=(b.group.position.z-camera.position.z)/55*130;const dot=document.createElement('i');dot.className='radar-dot';dot.style.left='calc(50% + '+THREE.MathUtils.clamp(dx,-62,62)+'px)';dot.style.top='calc(50% + '+THREE.MathUtils.clamp(dz,-62,62)+'px)';root.append(dot);}
+ for(const b of getDamageableUnits()){if(!b.alive)continue;const p=b.group.getWorldPosition(new THREE.Vector3());const dx=(p.x-camera.position.x)/55*130,dz=(p.z-camera.position.z)/55*130;const dot=document.createElement('i');dot.className='radar-dot';dot.style.left='calc(50% + '+THREE.MathUtils.clamp(dx,-62,62)+'px)';dot.style.top='calc(50% + '+THREE.MathUtils.clamp(dz,-62,62)+'px)';root.append(dot);}
  if(routeActive&&routeMarker){
   const dx=(routeMarker.position.x-camera.position.x)/55*130,dz=(routeMarker.position.z-camera.position.z)/55*130;
   const exit=document.createElement('i');exit.className='radar-route-dot';exit.textContent='➤';exit.style.position='absolute';exit.style.width='19px';exit.style.height='19px';exit.style.display='grid';exit.style.placeItems='center';exit.style.borderRadius='50%';exit.style.background='#7dffb2';exit.style.color='#07130d';exit.style.fontSize='13px';exit.style.fontWeight='900';exit.style.zIndex='5';exit.style.boxShadow='0 0 10px #7dffb2';

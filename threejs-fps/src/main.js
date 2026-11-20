@@ -1025,7 +1025,7 @@ function updateRadar(){
  for(const b of bots){if(!b.alive)continue;const dx=(b.group.position.x-camera.position.x)/55*130,dz=(b.group.position.z-camera.position.z)/55*130;const dot=document.createElement('i');dot.className='radar-dot';dot.style.left='calc(50% + '+THREE.MathUtils.clamp(dx,-62,62)+'px)';dot.style.top='calc(50% + '+THREE.MathUtils.clamp(dz,-62,62)+'px)';root.append(dot);}
  if(routeActive&&routeMarker){
   const dx=(routeMarker.position.x-camera.position.x)/55*130,dz=(routeMarker.position.z-camera.position.z)/55*130;
-  const exit=document.createElement('i');exit.className='radar-route-dot';exit.textContent='➤';
+  const exit=document.createElement('i');exit.className='radar-route-dot';exit.textContent='➤';exit.style.position='absolute';exit.style.width='19px';exit.style.height='19px';exit.style.display='grid';exit.style.placeItems='center';exit.style.borderRadius='50%';exit.style.background='#7dffb2';exit.style.color='#07130d';exit.style.fontSize='13px';exit.style.fontWeight='900';exit.style.zIndex='5';exit.style.boxShadow='0 0 10px #7dffb2';
   exit.style.left='calc(50% + '+THREE.MathUtils.clamp(dx,-62,62)+'px)';exit.style.top='calc(50% + '+THREE.MathUtils.clamp(dz,-62,62)+'px)';
   exit.style.transform='translate(-50%,-50%) rotate('+Math.atan2(dx,-dz)+'rad)';root.append(exit);
  }

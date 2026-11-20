@@ -436,7 +436,10 @@ soldierLoader.load('https://threejs.org/examples/models/gltf/Soldier.glb',gltf=>
 },undefined,error=>console.warn('Soldier model unavailable; using local fallback:',error));
 function attachSoldier(bot){
  if(!soldierTemplate||!bot.alive)return;
- const old=bot.group.getObjectByName('fallback-body');if(old)bot.group.remove(old);
+ const old=bot.group.getObjectByName('fallback-body');
+ // Preserve the already-positioned enemy rifle from the combat fallback before swapping the body for the 3D rig.
+ if(old)old.updateMatrixWorld(true);
+ const fallbackWeapon=!bot.ally&&old?old.getObjectByName('held-rifle'):null;
  const model=cloneSkeleton(soldierTemplate);model.name='rigged-soldier';model.scale.setScalar(1.0);model.position.y=0;
  // Soldier.glb already faces -Z, the same forward direction as the player.
  model.rotation.y=0;
@@ -455,20 +458,13 @@ function attachSoldier(bot){
   }return m;};
   o.material=Array.isArray(o.material)?o.material.map(paintAlly):paintAlly(o.material);
  });
+ if(old)bot.group.remove(old);
  bot.group.add(model);bot.model=model;
- // The rigged Soldier.glb carries the friendly operator's weapon and authored hand pose.
- // Avoid adding the old block-built placeholder rifle to allied 3D characters.
- if(!bot.ally){
-  const heldRifle=new THREE.Group();heldRifle.name='held-rifle';
-  heldRifle.position.set(-.02,1.43,-.34);heldRifle.rotation.y=Math.PI;model.add(heldRifle);
-  const rifleMetal=mat(0x20282a,.36,.7),riflePoly=mat(0x343b35,.8,.05);
-  const receiver=new THREE.Mesh(new THREE.BoxGeometry(.13,.14,.43),rifleMetal);heldRifle.add(receiver);
-  const handguard=new THREE.Mesh(new THREE.BoxGeometry(.105,.105,.32),riflePoly);handguard.position.z=.31;heldRifle.add(handguard);
-  const barrel=new THREE.Mesh(new THREE.CylinderGeometry(.022,.022,.5,12),rifleMetal);barrel.rotation.x=Math.PI/2;barrel.position.z=.69;heldRifle.add(barrel);
-  const stock=new THREE.Mesh(new THREE.BoxGeometry(.1,.12,.25),riflePoly);stock.position.z=-.31;heldRifle.add(stock);
-  const magazine=new THREE.Mesh(new THREE.BoxGeometry(.09,.24,.13),rifleMetal);magazine.position.set(0,-.17,.1);heldRifle.add(magazine);
-  heldRifle.traverse(o=>{if(o.isMesh){o.castShadow=true;o.receiveShadow=true;}});
-  bot.heldRifle=heldRifle;
+ // Reuse the enemy's original detailed rifle and preserve its exact hand-ready transform.
+ if(fallbackWeapon){
+  model.attach(fallbackWeapon);
+  fallbackWeapon.traverse(o=>{if(o.isMesh){o.castShadow=true;o.receiveShadow=true;}});
+  bot.heldRifle=fallbackWeapon;
  }
  // Preserve the original Soldier.glb rig and its animated arms; do not add duplicate geometry.
  bot.mixer=new THREE.AnimationMixer(model);
@@ -497,7 +493,7 @@ function makeBot(index){
   const leg=new THREE.Mesh(new THREE.CapsuleGeometry(.105,.48,4,8),cloth);leg.position.set(side*.16,.43,0);fallback.add(leg);
   const boot=new THREE.Mesh(new THREE.BoxGeometry(.2,.12,.32),dark);boot.position.set(side*.16,.12,-.06);fallback.add(boot);
  }
- const rifle=new THREE.Group();rifle.position.set(.02,1.43,.34);fallback.add(rifle);
+ const rifle=new THREE.Group();rifle.name='held-rifle';rifle.position.set(.02,1.43,.34);fallback.add(rifle);
  const rifleBody=new THREE.Mesh(new THREE.BoxGeometry(.13,.13,.46),dark);rifle.add(rifleBody);
  const rifleBarrel=new THREE.Mesh(new THREE.CylinderGeometry(.025,.025,.48,10),dark);rifleBarrel.rotation.x=Math.PI/2;rifleBarrel.position.z=.43;rifle.add(rifleBarrel);
  const rifleStock=new THREE.Mesh(new THREE.BoxGeometry(.1,.11,.24),cloth);rifleStock.position.z=-.31;rifle.add(rifleStock);

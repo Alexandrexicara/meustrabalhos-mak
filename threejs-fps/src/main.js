@@ -681,10 +681,13 @@ function updateCampaignRoute(dt){
  const bearing=Math.atan2(dx,-dz),relative=bearing+camera.rotation.y;const arrow=$('route-arrow');arrow.style.transform='rotate('+relative+'rad)';$('route-distance').textContent=Math.ceil(dist)+' M';$('route-label').textContent='NEXT OPERATION';
  if(routeMarker)routeMarker.rotation.y+=dt*.55;
  if(dist<3.2){
+  // Cross the extraction point on foot. Keep the player's position and heading:
+  // the next combat sector is built around the route exit, not a teleport to spawn.
+  const entryX=routeMarker.position.x,entryZ=routeMarker.position.z+4.2,heading=camera.rotation.clone();
   routeActive=false;panel.classList.add('hidden');if(routeMarker){world.remove(routeMarker);routeMarker=null;}
   player.round++;player.health=Math.min(100,player.health+18);player.ammo=30;player.reserve+=30;player.grenades=Math.min(5,player.grenades+1);
-  camera.position.set(0,1.72,8);camera.rotation.set(0,0,0);player.velocity.set(0,0,0);player.onGround=true;
-  spawnWave();updateHUD();toast('NEW OPERATION // '+mapThemes[currentMap].name);return;
+  camera.position.set(entryX,1.72,entryZ);camera.rotation.copy(heading);player.velocity.set(0,0,0);player.onGround=true;onRooftop=false;
+  spawnWave();updateHUD();toast('SECTOR '+String(player.round).padStart(2,'0')+' // OPERAÇÃO CONTINUA');return;
  }
 }
 function updateMission(dt){
@@ -1017,7 +1020,16 @@ function updateBots(dt){
   if(clearShot&&dist<=38)fireBot(b,dt);
  }
 }
-function updateRadar(){const root=$('radar-dots');root.innerHTML='';for(const b of bots){if(!b.alive)continue;const dx=(b.group.position.x-camera.position.x)/55*130,dz=(b.group.position.z-camera.position.z)/55*130;const dot=document.createElement('i');dot.className='radar-dot';dot.style.left='calc(50% + '+THREE.MathUtils.clamp(dx,-62,62)+'px)';dot.style.top='calc(50% + '+THREE.MathUtils.clamp(dz,-62,62)+'px)';root.append(dot);}}
+function updateRadar(){
+ const root=$('radar-dots');root.innerHTML='';
+ for(const b of bots){if(!b.alive)continue;const dx=(b.group.position.x-camera.position.x)/55*130,dz=(b.group.position.z-camera.position.z)/55*130;const dot=document.createElement('i');dot.className='radar-dot';dot.style.left='calc(50% + '+THREE.MathUtils.clamp(dx,-62,62)+'px)';dot.style.top='calc(50% + '+THREE.MathUtils.clamp(dz,-62,62)+'px)';root.append(dot);}
+ if(routeActive&&routeMarker){
+  const dx=(routeMarker.position.x-camera.position.x)/55*130,dz=(routeMarker.position.z-camera.position.z)/55*130;
+  const exit=document.createElement('i');exit.className='radar-route-dot';exit.textContent='➤';
+  exit.style.left='calc(50% + '+THREE.MathUtils.clamp(dx,-62,62)+'px)';exit.style.top='calc(50% + '+THREE.MathUtils.clamp(dz,-62,62)+'px)';
+  exit.style.transform='translate(-50%,-50%) rotate('+Math.atan2(dx,-dz)+'rad)';root.append(exit);
+ }
+}
 function update(dt){
  elapsed+=dt;for(let hi=0;hi<helicopters.length;hi++){const heli=helicopters[hi];if(heli.destroyed)continue;heli.phase+=dt*.48;const g=heli.group;g.position.x=((elapsed*(2+hi*.18)+48-hi*17)%110)-55;g.position.y=15+Math.sin(elapsed*.55+heli.phase)*.65;g.position.z=-27+Math.sin(elapsed*.24+heli.phase)*7-hi*10;g.rotation.y=Math.PI+Math.sin(elapsed*.24+heli.phase)*.12;heli.mainRotor.rotation.y+=dt*34;heli.tailRotor.rotation.x+=dt*29;if(player.active&&player.alive){heli.attack-=dt;if(heli.attack<=0){heli.attack=rand(3.4,5.2);const origin=g.position.clone().add(new THREE.Vector3(1,-.4,0)),target=camera.position.clone().add(new THREE.Vector3(rand(-1.5,1.5),0,rand(-1.5,1.5))),dir=target.sub(origin).normalize();const bolt=new THREE.Mesh(new THREE.CylinderGeometry(.045,.045,.85,6),new THREE.MeshBasicMaterial({color:0xffb45e,emissive:0xff5522}));bolt.position.copy(origin);bolt.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0),dir);scene.add(bolt);heliBullets.push({mesh:bolt,heli,velocity:dir.multiplyScalar(27),life:2.2});}}}updateHelicopterDebris(dt);for(let i=heliBullets.length-1;i>=0;i--){const b=heliBullets[i];b.mesh.position.addScaledVector(b.velocity,dt);b.life-=dt;if(b.mesh.position.distanceTo(camera.position)<.65){damagePlayer(10);b.life=-1;}if(b.life<=0){scene.remove(b.mesh);heliBullets.splice(i,1);}}
  for(let i=heliBullets.length-1;i>=0;i--){const b=heliBullets[i];b.mesh.position.addScaledVector(b.velocity,dt);b.life-=dt;if(b.mesh.position.distanceTo(camera.position)<.65){damagePlayer(10);b.life=-1;}if(b.life<=0){scene.remove(b.mesh);heliBullets.splice(i,1);}}

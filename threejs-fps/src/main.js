@@ -414,7 +414,7 @@ const bots=[]; const allies=[]; const bullets=[]; const enemyBullets=[]; const g
 let missionMarker=null,routeMarker=null,routeActive=false,missionKind='eliminate',missionProgress=0,missionDuration=0,missionX=0,missionZ=-8,missionDone=false; const raycaster=new THREE.Raycaster();
 const keys={}; let pointerLocked=false, elapsed=0, roundTime=120, recoil=0, bob=0, shotCooldown=0, toastTimeout;
 const isTouchDevice=window.matchMedia('(pointer: coarse)').matches||navigator.maxTouchPoints>0;
-let mobileFiring=false;
+let mobileLastTap={region:'',time:0,x:0,y:0};
 const $=id=>document.getElementById(id);
 const startScreen=$('start-screen'),pauseScreen=$('pause-screen'),roundScreen=$('round-screen'),gameoverScreen=$('gameover-screen');
 const mapBounds=36;const supplyPickups=[];const roofTopHeight=4.6;let onRooftop=false;const ladderPosition={x:6.95,z:-17};const ladderClimb={active:false,direction:'up',time:0,duration:3.8,start:new THREE.Vector3(),end:new THREE.Vector3()};const roofBounds={minX:-6.35,maxX:6.35,minZ:-22.35,maxZ:-11.65};
@@ -971,21 +971,27 @@ if(isTouchDevice){
  $('mobile-controls')?.classList.add('touch-enabled');
  const ladderButton=document.createElement('button');ladderButton.id='mobile-ladder';ladderButton.type='button';ladderButton.textContent='SUBIR ESCADA';ladderButton.style.cssText='position:absolute;right:18px;bottom:190px;z-index:30;padding:12px 14px;border:1px solid #d9b46c;border-radius:8px;background:#18251fe8;color:#fff;font:700 12px system-ui;letter-spacing:.06em;display:none';document.body.appendChild(ladderButton);ladderButton.addEventListener('pointerdown',e=>{e.preventDefault();keys.KeyE=true;});
  const stick=$('move-stick'),knob=$('move-knob'),look=$('mobile-look-zone');
- let stickPointer=null,lookPointer=null,stickCenter={x:0,y:0},lookPoint={x:0,y:0};
+ let stickPointer=null,lookPointer=null,stickCenter={x:0,y:0},lookPoint={x:0,y:0},lookStart={x:0,y:0},lookMoved=false;
  const setMove=(x,y)=>{keys.KeyW=y<-.22;keys.KeyS=y>.22;keys.KeyA=x<-.22;keys.KeyD=x>.22;};
  const resetStick=()=>{stickPointer=null;knob.style.transform='translate(0,0)';setMove(0,0);};
  stick?.addEventListener('pointerdown',e=>{e.preventDefault();e.stopPropagation();stickPointer=e.pointerId;stick.setPointerCapture(e.pointerId);const r=stick.getBoundingClientRect();stickCenter={x:r.left+r.width/2,y:r.top+r.height/2};});
  stick?.addEventListener('pointermove',e=>{if(e.pointerId!==stickPointer)return;e.preventDefault();const dx=e.clientX-stickCenter.x,dy=e.clientY-stickCenter.y,max=stick.clientWidth*.31,len=Math.hypot(dx,dy)||1,scale=Math.min(1,max/len),x=dx*scale,y=dy*scale;knob.style.transform='translate('+x+'px,'+y+'px)';setMove(x/max,y/max);});
  stick?.addEventListener('pointerup',resetStick);stick?.addEventListener('pointercancel',resetStick);stick?.addEventListener('lostpointercapture',resetStick);
- look?.addEventListener('pointerdown',e=>{if(e.target.closest('button')||e.target.closest('#move-stick'))return;e.preventDefault();lookPointer=e.pointerId;look.setPointerCapture(e.pointerId);lookPoint={x:e.clientX,y:e.clientY};});
- look?.addEventListener('pointermove',e=>{if(e.pointerId!==lookPointer||!player.active)return;e.preventDefault();const dx=e.clientX-lookPoint.x,dy=e.clientY-lookPoint.y;lookPoint={x:e.clientX,y:e.clientY};camera.rotation.order='YXZ';camera.rotation.y-=dx*.002;camera.rotation.x=THREE.MathUtils.clamp(camera.rotation.x-dy*.002,-1.35,1.35);});
- const stopLook=e=>{if(e.pointerId===lookPointer)lookPointer=null;};look?.addEventListener('pointerup',stopLook);look?.addEventListener('pointercancel',stopLook);
- const bindHold=(id,down,up=()=>{})=>{const el=$(id);if(!el)return;el.addEventListener('pointerdown',e=>{e.preventDefault();e.stopPropagation();el.setPointerCapture(e.pointerId);down();});const end=e=>{e.preventDefault();up();};el.addEventListener('pointerup',end);el.addEventListener('pointercancel',end);el.addEventListener('lostpointercapture',up);};
- bindHold('mobile-fire',()=>{mobileFiring=true;shoot();},()=>{mobileFiring=false;});
- bindHold('mobile-jump',()=>{keys.Space=true;},()=>{keys.Space=false;});
- $('mobile-grenade')?.addEventListener('pointerdown',e=>{e.preventDefault();e.stopPropagation();throwGrenade();});
- $('mobile-reload')?.addEventListener('pointerdown',e=>{e.preventDefault();e.stopPropagation();reload();});
- $('mobile-switch')?.addEventListener('pointerdown',e=>{e.preventDefault();e.stopPropagation();setWeapon(player.weaponType==='rifle'?'pistol':'rifle');});
+ look?.addEventListener('pointerdown',e=>{if(e.target.closest('button')||e.target.closest('#move-stick'))return;e.preventDefault();lookPointer=e.pointerId;look.setPointerCapture(e.pointerId);lookPoint={x:e.clientX,y:e.clientY};lookStart={x:e.clientX,y:e.clientY};lookMoved=false;});
+ look?.addEventListener('pointermove',e=>{if(e.pointerId!==lookPointer||!player.active)return;e.preventDefault();const dx=e.clientX-lookPoint.x,dy=e.clientY-lookPoint.y;if(Math.hypot(e.clientX-lookStart.x,e.clientY-lookStart.y)>10)lookMoved=true;lookPoint={x:e.clientX,y:e.clientY};camera.rotation.order='YXZ';camera.rotation.y-=dx*.002;camera.rotation.x=THREE.MathUtils.clamp(camera.rotation.x-dy*.002,-1.35,1.35);});
+ const stopLook=e=>{if(e.pointerId!==lookPointer)return;
+  if(!lookMoved&&player.active&&player.alive){
+   const x=e.clientX,y=e.clientY,region=y>innerHeight*.58?(x>innerWidth*.52?'weapon':'hand'):'';
+   if(region){
+    const now=performance.now(),same=mobileLastTap.region===region&&now-mobileLastTap.time<380&&Math.hypot(x-mobileLastTap.x,y-mobileLastTap.y)<42;
+    if(same){if(region==='weapon')shoot();else throwGrenade();mobileLastTap={region:'',time:0,x:0,y:0};}
+    else mobileLastTap={region,time:now,x,y};
+   }
+  }
+  lookPointer=null;
+ };look?.addEventListener('pointerup',stopLook);look?.addEventListener('pointercancel',e=>{if(e.pointerId===lookPointer)lookPointer=null;});
+ // Disparo e granada são acionados por dois toques rápidos na área visual da arma/mão.
+ // O arraste continua reservado exclusivamente para movimentar a mira.
 }
 document.addEventListener('contextmenu',e=>{if(isTouchDevice)e.preventDefault();});
 document.addEventListener('mousedown',e=>{if(e.button===0)shoot();if(e.button===2){e.preventDefault();throwGrenade();}});canvas.addEventListener('contextmenu',e=>e.preventDefault());document.addEventListener('keydown',e=>{keys[e.code]=true;if(e.code==='KeyR')reload();if(e.code==='Digit1')setWeapon('rifle');if(e.code==='Digit2')setWeapon('pistol');if(e.code==='Digit3'&&player.rocketAmmo>0)setWeapon('launcher');if(e.code==='KeyG')throwGrenade();if(e.code==='Escape'&&pointerLocked){};});document.addEventListener('keyup',e=>keys[e.code]=false);
@@ -1061,7 +1067,7 @@ function update(dt){
  elapsed+=dt;for(let hi=0;hi<helicopters.length;hi++){const heli=helicopters[hi];if(heli.destroyed)continue;heli.phase+=dt*.48;const g=heli.group;g.position.x=((elapsed*(2+hi*.18)+48-hi*17)%110)-55;g.position.y=15+Math.sin(elapsed*.55+heli.phase)*.65;g.position.z=-27+Math.sin(elapsed*.24+heli.phase)*7-hi*10;g.rotation.y=Math.PI+Math.sin(elapsed*.24+heli.phase)*.12;heli.mainRotor.rotation.y+=dt*34;heli.tailRotor.rotation.x+=dt*29;if(player.active&&player.alive){heli.attack-=dt;if(heli.attack<=0){heli.attack=rand(3.4,5.2);const origin=g.position.clone().add(new THREE.Vector3(1,-.4,0)),target=camera.position.clone().add(new THREE.Vector3(rand(-1.5,1.5),0,rand(-1.5,1.5))),dir=target.sub(origin).normalize();const bolt=new THREE.Mesh(new THREE.CylinderGeometry(.045,.045,.85,6),new THREE.MeshBasicMaterial({color:0xffb45e,emissive:0xff5522}));bolt.position.copy(origin);bolt.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0),dir);scene.add(bolt);heliBullets.push({mesh:bolt,heli,velocity:dir.multiplyScalar(27),life:2.2});}}}updateHelicopterDebris(dt);for(let i=heliBullets.length-1;i>=0;i--){const b=heliBullets[i];b.mesh.position.addScaledVector(b.velocity,dt);b.life-=dt;if(b.mesh.position.distanceTo(camera.position)<.65){damagePlayer(10);b.life=-1;}if(b.life<=0){scene.remove(b.mesh);heliBullets.splice(i,1);}}
  for(let i=heliBullets.length-1;i>=0;i--){const b=heliBullets[i];b.mesh.position.addScaledVector(b.velocity,dt);b.life-=dt;if(b.mesh.position.distanceTo(camera.position)<.65){damagePlayer(10);b.life=-1;}if(b.life<=0){scene.remove(b.mesh);heliBullets.splice(i,1);}}
  updateCombatVehicles(dt);
- updateRocketProjectiles(dt);shotCooldown=Math.max(0,shotCooldown-dt);recoil=Math.max(0,recoil-dt*.55);if(isTouchDevice&&mobileFiring&&player.active)shoot();
+ updateRocketProjectiles(dt);shotCooldown=Math.max(0,shotCooldown-dt);recoil=Math.max(0,recoil-dt*.55);
  if(player.active&&player.alive){
   if(!routeActive){roundTime-=dt;if(roundTime<=0){roundTime=0;damagePlayer(12);roundTime=12;}updateTimer();}
   const crouched=!!(keys.KeyC||keys.ControlLeft||keys.ControlRight);

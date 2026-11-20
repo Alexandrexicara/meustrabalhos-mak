@@ -439,7 +439,7 @@ function attachSoldier(bot){
  const model=cloneSkeleton(soldierTemplate);model.name='rigged-soldier';model.scale.setScalar(1.0);model.position.y=0;
  // Soldier.glb already faces -Z, the same forward direction as the player.
  model.rotation.y=0;
- model.traverse(o=>{if(o.isMesh){o.castShadow=true;o.receiveShadow=true;if(o.material){o.material=o.material.clone();if(bot.ally&&!/head|skin|face|hand|eye/i.test((o.material.name||'')+' '+(o.name||''))){o.material.color?.setHex(0x236bd1);o.material.needsUpdate=true;}}}});
+ model.traverse(o=>{if(o.isMesh){o.castShadow=true;o.receiveShadow=true;if(o.material){o.material=o.material.clone();}}});
  bot.group.add(model);bot.model=model;
  // Attach a visible rifle to the soldier's hands; barrel points along the soldier's forward axis (+Z).
  const heldRifle=new THREE.Group();heldRifle.name='held-rifle';
@@ -453,12 +453,7 @@ function attachSoldier(bot){
  const magazine=new THREE.Mesh(new THREE.BoxGeometry(.09,.24,.13),rifleMetal);magazine.position.set(0,-.17,.1);heldRifle.add(magazine);
  heldRifle.traverse(o=>{if(o.isMesh){o.castShadow=true;o.receiveShadow=true;}});
  bot.heldRifle=heldRifle;
- // Overlay both forearms in a true two-hand firing grip, aligned with the stock and handguard.
- const arms=new THREE.Group();arms.name='rifle-grip-arms';model.add(arms);const sleeve=mat(0x36a66a),glove=mat(0x080b0e);
- const armBetween=(a,b,r=.075)=>{const v=new THREE.Vector3(...b).sub(new THREE.Vector3(...a));const mesh=new THREE.Mesh(new THREE.CapsuleGeometry(r,Math.max(.08,v.length()-.12),5,8),sleeve);mesh.position.set((a[0]+b[0])/2,(a[1]+b[1])/2,(a[2]+b[2])/2);mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0),v.normalize());mesh.castShadow=true;arms.add(mesh);};
- armBetween([-.29,1.43,0],[-.12,1.34,-.57]);armBetween([.29,1.43,0],[.13,1.34,-.39]);
- for(const p of [[-.12,1.34,-.57],[.13,1.34,-.39]]){const hand=new THREE.Mesh(new THREE.SphereGeometry(.085,10,8),glove);hand.position.set(...p);hand.castShadow=true;arms.add(hand);}
- bot.rifleGripArms=arms;
+ // Preserve the original Soldier.glb rig and its animated arms; do not add duplicate geometry.
  bot.mixer=new THREE.AnimationMixer(model);
  const idle=soldierClips.find(c=>/idle/i.test(c.name))||soldierClips[0];
  const walk=soldierClips.find(c=>/walk/i.test(c.name))||idle;

@@ -465,12 +465,21 @@ function attachSoldier(bot){
   fallbackWeapon.traverse(o=>{if(o.isMesh){o.castShadow=true;o.receiveShadow=true;}});
   bot.heldRifle=fallbackWeapon;
  }
- bot.rightHand=null;bot.leftHand=null;
+ bot.rightHand=null;bot.leftHand=null;bot.rightArm=null;bot.leftArm=null;bot.rightForeArm=null;bot.leftForeArm=null;
  model.traverse(o=>{
+  if(!o.isBone)return;
   const boneName=(o.name||'').toLowerCase().replace(/[^a-z]/g,'');
-  if(!bot.rightHand&&boneName.includes('righthand'))bot.rightHand=o;
-  if(!bot.leftHand&&boneName.includes('lefthand'))bot.leftHand=o;
+  if(boneName.endsWith('righthand'))bot.rightHand=o;
+  else if(boneName.endsWith('lefthand'))bot.leftHand=o;
+  else if(boneName.endsWith('rightforearm'))bot.rightForeArm=o;
+  else if(boneName.endsWith('leftforearm'))bot.leftForeArm=o;
+  else if(boneName.endsWith('rightarm'))bot.rightArm=o;
+  else if(boneName.endsWith('leftarm'))bot.leftArm=o;
  });
+ bot.combatBase={};
+ for(const key of ['rightArm','leftArm','rightForeArm','leftForeArm']){
+  const bone=bot[key];if(bone)bot.combatBase[key]=bone.quaternion.clone();
+ }
  // Preserve the original Soldier.glb rig and its animated arms; do not add duplicate geometry.
  bot.mixer=new THREE.AnimationMixer(model);
  const idle=soldierClips.find(c=>/idle/i.test(c.name))||soldierClips[0];
@@ -482,23 +491,24 @@ function attachSoldier(bot){
 }
 function updateHeldRifle(bot){
  if(!bot?.model||!bot.heldRifle)return;
+ const base=bot.combatBase||{};
+ const pose=(key,axis,angle)=>{
+  const bone=bot[key],q=base[key];if(!bone||!q)return;
+  bone.quaternion.copy(q).multiply(new THREE.Quaternion().setFromAxisAngle(axis,angle));
+ };
+ pose('rightArm',new THREE.Vector3(0,1,0),.88);
+ pose('leftArm',new THREE.Vector3(0,1,0),-.88);
+ pose('rightForeArm',new THREE.Vector3(0,0,1),-1.02);
+ pose('leftForeArm',new THREE.Vector3(0,0,1),1.02);
  bot.model.updateMatrixWorld(true);
  const right=bot.rightHand,left=bot.leftHand;
  if(right&&left){
-  const a=right.getWorldPosition(new THREE.Vector3());
-  const b=left.getWorldPosition(new THREE.Vector3());
-  const midpoint=a.add(b).multiplyScalar(.5);
-  bot.heldRifle.position.copy(bot.model.worldToLocal(midpoint));
-  bot.heldRifle.position.z-=.08;
-  bot.heldRifle.position.y+=.025;
+  const grip=right.getWorldPosition(new THREE.Vector3()).lerp(left.getWorldPosition(new THREE.Vector3()),.5);
+  bot.heldRifle.position.copy(bot.model.worldToLocal(grip));
+  bot.heldRifle.position.z-=.03;
  }else if(right){
-  const hand=right.getWorldPosition(new THREE.Vector3());
-  bot.heldRifle.position.copy(bot.model.worldToLocal(hand));
-  bot.heldRifle.position.z-=.18;
- }else{
-  bot.heldRifle.position.set(0,1.34,-.28);
- }
- // Rifle barrel is built along +Z; rotate it toward the soldier's -Z facing direction.
+  bot.heldRifle.position.copy(bot.model.worldToLocal(right.getWorldPosition(new THREE.Vector3())));
+ }else bot.heldRifle.position.set(.02,1.34,-.28);
  bot.heldRifle.rotation.set(0,Math.PI,0);
 }
 function setBotAnimation(bot,name){
@@ -560,13 +570,13 @@ function updateAllies(dt){
  for(let i=0;i<allies.length;i++){
   const a=allies[i];if(!a.alive){if(a.dying){a.deathAge+=dt;const t=Math.min(1,a.deathAge/.48);a.group.rotation.z=a.deathSide*1.48*t;a.group.position.y=a.deathStartY-.78*t;if(t>=1){a.dying=false;a.corpse=true;}}continue;}
   if(a.mixer)a.mixer.update(dt);
+  updateHeldRifle(a);
   const angle=camera.rotation.y,offset=[[-2.8,0.9],[2.8,0.9],[-2.8,-1.3],[2.8,-1.3]][i];
   const desiredX=camera.position.x+offset[0]*Math.cos(angle)+offset[1]*Math.sin(angle);
   const desiredZ=camera.position.z-offset[0]*Math.sin(angle)+offset[1]*Math.cos(angle);
   const dx=desiredX-a.group.position.x,dz=desiredZ-a.group.position.z,dist=Math.hypot(dx,dz);
   if(dist>1.15){const step=Math.min(dist-1.05,a.speed*1.65*dt);const nx=a.group.position.x+dx/dist*step,nz=a.group.position.z+dz/dist*step;a.group.rotation.y=Math.atan2(-dx,-dz);if(!moveBlocked(nx,a.group.position.z))a.group.position.x=nx;if(!moveBlocked(a.group.position.x,nz))a.group.position.z=nz;setBotAnimation(a,'run');}
   else setBotAnimation(a,'idle');
-  updateHeldRifle(a);
   // Allies cover the flanks. Hostiles in the player's forward field are reserved
   // for the player to engage, so squad support never clears the main sightline.
   const playerForward=new THREE.Vector3(0,0,-1).applyAxisAngle(new THREE.Vector3(0,1,0),camera.rotation.y);
@@ -850,11 +860,11 @@ function updateBots(dt){
   if(b.dying){b.deathAge+=dt;const t=Math.min(1,b.deathAge/.48);b.group.rotation.z=b.deathSide*1.48*t;b.group.position.y=b.deathStartY-.78*t;if(t>=1){b.dying=false;b.corpse=true;}continue;}
   if(!b.alive)continue;
   if(b.mixer)b.mixer.update(dt);
+  updateHeldRifle(b);
   const p=b.group.position;
   const dx=camera.position.x-p.x,dz=camera.position.z-p.z,dist=Math.hypot(dx,dz)||1;
   // Soldier.glb faces local -Z: rotate the whole hostile so its chest and rifle face the player.
   b.group.rotation.y=Math.atan2(-dx,-dz);
-  updateHeldRifle(b);
   // Hostiles stay in a ready stance but only open fire at close range.
   if(!b.alerted&&dist<=13){b.alerted=true;b.fire=rand(.45,.9);b.burst=rand(2,4);b.strafeTimer=rand(2,4);}
   if(!b.alerted){setBotAnimation(b,'idle');continue;}

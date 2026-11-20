@@ -1,6 +1,8 @@
 const API='https://tactical-strike-api.onrender.com',$=id=>document.getElementById(id);
 let token=localStorage.getItem('tacticalStrikeToken')||'';
 window.__tacticalLicenseActive=false;
+const adminGameSession=!!sessionStorage.getItem('tacticalStrikeAdminGameToken');
+if(adminGameSession){const launch=$('deploy-btn');if(launch)launch.textContent='VALIDANDO ACESSO ADMIN...';}
 const gate=$('license-gate'),form=$('license-form'),status=$('license-status'),pay=$('payment-panel');
 function show(t,error=false){status.textContent=t;status.dataset.error=error?'true':'false';}
 function openGate(){gate.classList.remove('hidden');if(token){pay.classList.remove('hidden');}else{pay.classList.add('hidden');}setTimeout(()=>$('license-email').focus(),80);}

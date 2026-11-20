@@ -138,3 +138,16 @@
  .weapon-desc,.weapon-hint{font-size:5px}
  .bottom-hud{height:24px}
 }
+
+/* Restore an unmistakable, accessible fullscreen button after the minimal HUD overrides. */
+#fullscreen-btn{
+ display:inline-flex!important;align-items:center;justify-content:center;gap:8px;
+ min-width:132px;min-height:44px;padding:0 14px!important;
+ border:1px solid rgba(197,243,107,.9)!important;border-radius:9px!important;
+ background:rgba(8,16,20,.94)!important;color:#e7ffd0!important;
+ box-shadow:0 3px 14px rgba(0,0,0,.55)!important;
+ font:800 11px 'IBM Plex Mono',monospace!important;letter-spacing:.6px!important;
+ text-shadow:none!important;cursor:pointer;
+}
+#fullscreen-btn:active{transform:scale(.97)}
+@media(max-width:760px){#fullscreen-btn{top:6px!important;right:6px!important;min-width:118px;min-height:40px;padding:0 11px!important;font-size:10px!important}}

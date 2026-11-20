@@ -712,6 +712,18 @@ canvas.addEventListener('click',()=>{if(!isTouchDevice&&!pointerLocked&&player.a
 document.addEventListener('pointerlockchange',()=>{pointerLocked=document.pointerLockElement===canvas;if(!pointerLocked&&player.active&&player.alive&&!startScreen.classList.contains('hidden'))return;if(!pointerLocked&&player.active&&player.alive){pauseScreen.classList.remove('hidden');}else{pauseScreen.classList.add('hidden');}});
 document.addEventListener('mousemove',e=>{if(!pointerLocked||!player.active)return;camera.rotation.order='YXZ';camera.rotation.y-=e.movementX*.0015;camera.rotation.x-=e.movementY*.0015;camera.rotation.x=THREE.MathUtils.clamp(camera.rotation.x,-1.35,1.35);});
 
+
+// Quick HUD panels: start hidden to keep the combat view clear on desktop and mobile.
+const radarPanel=document.querySelector('.radar-card');
+const weaponPanel=document.querySelector('.weapon-card');
+const radarToggle=$('toggle-radar');
+const weaponsToggle=$('toggle-weapons');
+function setCombatPanel(panel,button,visible){if(!panel||!button)return;panel.classList.toggle('panel-collapsed',!visible);button.setAttribute('aria-expanded',String(visible));button.classList.toggle('is-active',visible);}
+setCombatPanel(radarPanel,radarToggle,false);
+setCombatPanel(weaponPanel,weaponsToggle,false);
+radarToggle?.addEventListener('click',()=>setCombatPanel(radarPanel,radarToggle,radarPanel.classList.contains('panel-collapsed')));
+weaponsToggle?.addEventListener('click',()=>setCombatPanel(weaponPanel,weaponsToggle,weaponPanel.classList.contains('panel-collapsed')));
+
 // Touchscreen controls: virtual movement stick, drag-to-look, and action buttons.
 if(isTouchDevice){
  $('mobile-controls')?.classList.add('touch-enabled');

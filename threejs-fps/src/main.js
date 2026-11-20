@@ -847,6 +847,25 @@ function shoot(){
   const crewHit=raycaster.intersectObjects(crewHitboxes,false)[0];
   if(crewHit&&(!hit||crewHit.distance<=hit.distance+.45))hit=crewHit;
  }
+ // Reliable center-mass fallback: if a thin/animated soldier mesh misses the ray,
+ // accept a very close crosshair pass, but never through a solid map obstruction.
+ if(type!=='launcher'&&!hit){
+  const shotRay=raycaster.ray;
+  const blockers=raycaster.intersectObjects(world.children,true).filter(h=>h.object.isMesh&&h.object.visible);
+  const firstBlock=blockers[0];
+  let bestAlong=Infinity,bestTarget=null,bestPoint=null;
+  for(const target of hostileTargets){
+   if(!target?.alive||!target.group?.visible)continue;
+   target.group.updateWorldMatrix(true,true);
+   const center=target.group.getWorldPosition(new THREE.Vector3()).add(new THREE.Vector3(0,1.15,0));
+   const along=center.clone().sub(shotRay.origin).dot(shotRay.direction);
+   if(along<=0||along>65||along>=bestAlong)continue;
+   if(shotRay.distanceSqToPoint(center)>.95*.95)continue;
+   if(firstBlock&&firstBlock.distance<along-.25)continue;
+   bestAlong=along;bestTarget=target;bestPoint=center;
+  }
+  if(bestTarget)hit={object:bestTarget.group,distance:bestAlong,point:bestPoint};
+ }
  const crateHits=raycaster.intersectObjects(destructibleCrates.filter(c=>c.alive).flatMap(c=>c.group.children),false);const crateHit=crateHits[0];
  const crewVehicle=hit?combatVehicles.find(v=>v.crew.some(s=>{let n=hit.object;while(n){if(n===s.group)return true;n=n.parent;}return false;})):null;const worldHits=raycaster.intersectObjects(world.children,true).filter(h=>h.object.isMesh&&h.object.visible);const surfaceHit=worldHits.find(h=>!destructibleCrates.some(c=>c.alive&&c.group===h.object.parent)&&!(crewVehicle&&(()=>{let n=h.object;while(n){if(n===crewVehicle.tank)return true;n=n.parent;}return false;})()));
  if(crateHit&&(!hit||crateHit.distance<hit.distance)&&(!surfaceHit||crateHit.distance<=surfaceHit.distance)){const owner=destructibleCrates.find(c=>c.alive&&c.group===crateHit.object.parent);const normal=crateHit.face?crateHit.face.normal.clone().transformDirection(crateHit.object.matrixWorld):new THREE.Vector3(0,0,1);if(owner)damageCrate(owner,type==='launcher'?100:type==='pistol'?22:28,crateHit.point,normal);if(type==='launcher'){damageCratesInBlast(crateHit.point,7,180);const blast=new THREE.Mesh(new THREE.SphereGeometry(1.15,14,10),new THREE.MeshBasicMaterial({color:0xff9a42,transparent:true,opacity:.78,depthWrite:false}));blast.position.copy(crateHit.point);scene.add(blast);explosions.push({mesh:blast,age:0});}}
@@ -934,7 +953,7 @@ function updateProjectiles(dt){
 }
 function reload(){if(!player.active||player.reloading)return;if(player.weaponType==='pistol'){if(player.pistolAmmo===12||player.pistolReserve<=0)return;player.reloading=true;playSound('reload');toast('SIDEARM RELOAD');setTimeout(()=>{const n=Math.min(12-player.pistolAmmo,player.pistolReserve);player.pistolAmmo+=n;player.pistolReserve-=n;player.reloading=false;updateHUD();},900);return;}if(player.weaponType==='launcher'){toast('AT-4 // DISPOSITIVO DE DISPARO ÚNICO');return;}if(player.ammo===30||player.reserve<=0){if(player.reserve<=0)setWeapon('pistol');return;}player.reloading=true;playSound('reload');toast('RELOADING');setTimeout(()=>{const n=Math.min(30-player.ammo,player.reserve);player.ammo+=n;player.reserve-=n;player.reloading=false;updateHUD();},1250);}
 function togglePause(){if(!player.active||!player.alive)return;if(pointerLocked){document.exitPointerLock();}else{canvas.requestPointerLock?.();}}
-async function begin(){try{if(window.__tacticalGameReady)await window.__tacticalGameReady;if(window.__tacticalAccessReady)await window.__tacticalAccessReady;}catch(error){console.warn('Access or scene readiness check failed:',error);}if(!window.__tacticalLicenseActive){window.openTacticalLicense?.();document.getElementById('license-gate')?.classList.remove('hidden');return;}initAudio();startScreen.classList.add('hidden');player.active=true;roundTime=120;updateHUD();if(!isTouchDevice)canvas.requestPointerLock?.();toast('OPERATION LIVE // GOOD HUNT');}
+async function begin(){try{const root=document.documentElement;if(!document.fullscreenElement&&!document.webkitFullscreenElement){const request=root.requestFullscreen||root.webkitRequestFullscreen||root.webkitRequestFullScreen;if(request){const result=request.call(root);if(result&&typeof result.catch==='function')result.catch(()=>{});}}if(window.__tacticalGameReady)await window.__tacticalGameReady;if(window.__tacticalAccessReady)await window.__tacticalAccessReady;}catch(error){console.warn('Access or scene readiness check failed:',error);}if(!window.__tacticalLicenseActive){window.openTacticalLicense?.();document.getElementById('license-gate')?.classList.remove('hidden');return;}initAudio();startScreen.classList.add('hidden');player.active=true;roundTime=120;updateHUD();if(!isTouchDevice)canvas.requestPointerLock?.();toast('OPERATION LIVE // GOOD HUNT');}
 $('deploy-btn').addEventListener('click',begin);
 if(new URLSearchParams(window.location.search).get('admin')==='1'){
   // A sessão do admin já foi validada pelo painel. Inicie a partida assim que

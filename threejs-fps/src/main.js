@@ -437,9 +437,8 @@ soldierLoader.load('https://threejs.org/examples/models/gltf/Soldier.glb',gltf=>
 function attachSoldier(bot){
  if(!soldierTemplate||!bot.alive)return;
  const old=bot.group.getObjectByName('fallback-body');
- // Preserve the already-positioned enemy rifle from the combat fallback before swapping the body for the 3D rig.
- if(old)old.updateMatrixWorld(true);
- const fallbackWeapon=!bot.ally&&old?old.getObjectByName('held-rifle'):null;
+ // Keep the fallback rifle for every soldier; it will be repositioned from the rig's hand bones.
+ const fallbackWeapon=old?old.getObjectByName('held-rifle'):null;
  const model=cloneSkeleton(soldierTemplate);model.name='rigged-soldier';model.scale.setScalar(1.0);model.position.y=0;
  // Soldier.glb already faces -Z, the same forward direction as the player.
  model.rotation.y=0;
@@ -460,12 +459,18 @@ function attachSoldier(bot){
  });
  if(old)bot.group.remove(old);
  bot.group.add(model);bot.model=model;
- // Reuse the enemy's original detailed rifle and preserve its exact hand-ready transform.
+ // Reparent the same rifle to the animated soldier rig for both allies and enemies.
  if(fallbackWeapon){
-  model.attach(fallbackWeapon);
+  model.add(fallbackWeapon);
   fallbackWeapon.traverse(o=>{if(o.isMesh){o.castShadow=true;o.receiveShadow=true;}});
   bot.heldRifle=fallbackWeapon;
  }
+ bot.rightHand=null;bot.leftHand=null;
+ model.traverse(o=>{
+  const boneName=(o.name||'').toLowerCase().replace(/[^a-z]/g,'');
+  if(!bot.rightHand&&boneName.includes('righthand'))bot.rightHand=o;
+  if(!bot.leftHand&&boneName.includes('lefthand'))bot.leftHand=o;
+ });
  // Preserve the original Soldier.glb rig and its animated arms; do not add duplicate geometry.
  bot.mixer=new THREE.AnimationMixer(model);
  const idle=soldierClips.find(c=>/idle/i.test(c.name))||soldierClips[0];
@@ -474,6 +479,27 @@ function attachSoldier(bot){
  // Use the complete authored clips. Removing arm tracks caused the soldiers to run with arms spread.
  bot.actions={idle:idle?bot.mixer.clipAction(idle):null,walk:walk?bot.mixer.clipAction(walk):null,run:run?bot.mixer.clipAction(run):null};
  bot.currentAction=null;setBotAnimation(bot,'idle');
+}
+function updateHeldRifle(bot){
+ if(!bot?.model||!bot.heldRifle)return;
+ bot.model.updateMatrixWorld(true);
+ const right=bot.rightHand,left=bot.leftHand;
+ if(right&&left){
+  const a=right.getWorldPosition(new THREE.Vector3());
+  const b=left.getWorldPosition(new THREE.Vector3());
+  const midpoint=a.add(b).multiplyScalar(.5);
+  bot.heldRifle.position.copy(bot.model.worldToLocal(midpoint));
+  bot.heldRifle.position.z-=.08;
+  bot.heldRifle.position.y+=.025;
+ }else if(right){
+  const hand=right.getWorldPosition(new THREE.Vector3());
+  bot.heldRifle.position.copy(bot.model.worldToLocal(hand));
+  bot.heldRifle.position.z-=.18;
+ }else{
+  bot.heldRifle.position.set(0,1.34,-.28);
+ }
+ // Rifle barrel is built along +Z; rotate it toward the soldier's -Z facing direction.
+ bot.heldRifle.rotation.set(0,Math.PI,0);
 }
 function setBotAnimation(bot,name){
  if(!bot.actions)return;const next=bot.actions[name]||bot.actions.idle;if(!next||bot.currentAction===next)return;
@@ -540,6 +566,7 @@ function updateAllies(dt){
   const dx=desiredX-a.group.position.x,dz=desiredZ-a.group.position.z,dist=Math.hypot(dx,dz);
   if(dist>1.15){const step=Math.min(dist-1.05,a.speed*1.65*dt);const nx=a.group.position.x+dx/dist*step,nz=a.group.position.z+dz/dist*step;a.group.rotation.y=Math.atan2(-dx,-dz);if(!moveBlocked(nx,a.group.position.z))a.group.position.x=nx;if(!moveBlocked(a.group.position.x,nz))a.group.position.z=nz;setBotAnimation(a,'run');}
   else setBotAnimation(a,'idle');
+  updateHeldRifle(a);
   // Allies cover the flanks. Hostiles in the player's forward field are reserved
   // for the player to engage, so squad support never clears the main sightline.
   const playerForward=new THREE.Vector3(0,0,-1).applyAxisAngle(new THREE.Vector3(0,1,0),camera.rotation.y);
@@ -827,6 +854,7 @@ function updateBots(dt){
   const dx=camera.position.x-p.x,dz=camera.position.z-p.z,dist=Math.hypot(dx,dz)||1;
   // Soldier.glb faces local -Z: rotate the whole hostile so its chest and rifle face the player.
   b.group.rotation.y=Math.atan2(-dx,-dz);
+  updateHeldRifle(b);
   // Hostiles stay in a ready stance but only open fire at close range.
   if(!b.alerted&&dist<=13){b.alerted=true;b.fire=rand(.45,.9);b.burst=rand(2,4);b.strafeTimer=rand(2,4);}
   if(!b.alerted){setBotAnimation(b,'idle');continue;}

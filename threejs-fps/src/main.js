@@ -1004,12 +1004,25 @@ if(isTouchDevice){
  stick?.addEventListener('pointerup',resetStick);stick?.addEventListener('pointercancel',resetStick);stick?.addEventListener('lostpointercapture',resetStick);
  look?.addEventListener('pointerdown',e=>{if(e.target.closest('button')||e.target.closest('#move-stick'))return;e.preventDefault();lookPointer=e.pointerId;look.setPointerCapture(e.pointerId);lookPoint={x:e.clientX,y:e.clientY};lookStart={x:e.clientX,y:e.clientY};lookMoved=false;});
  look?.addEventListener('pointermove',e=>{if(e.pointerId!==lookPointer||!player.active)return;e.preventDefault();const dx=e.clientX-lookPoint.x,dy=e.clientY-lookPoint.y;if(Math.hypot(e.clientX-lookStart.x,e.clientY-lookStart.y)>10)lookMoved=true;lookPoint={x:e.clientX,y:e.clientY};camera.rotation.order='YXZ';camera.rotation.y-=dx*.002;camera.rotation.x=THREE.MathUtils.clamp(camera.rotation.x-dy*.002,-1.35,1.35);});
- const projectedArmPoints=()=>{camera.updateMatrixWorld(true);return [leftHand,leftElbow,leftForearmGuard].map(part=>{const p=new THREE.Vector3();part.getWorldPosition(p);p.project(camera);return {x:(p.x*.5+.5)*innerWidth,y:(-.5*p.y+.5)*innerHeight};});};
+ const projectTapPoints=(root,locals)=>{camera.updateMatrixWorld(true);root.updateMatrixWorld(true);return locals.map(v=>{const p=root.localToWorld(new THREE.Vector3(...v)).project(camera);return {x:(p.x*.5+.5)*innerWidth,y:(-.5*p.y+.5)*innerHeight};});};
  const stopLook=e=>{if(e.pointerId!==lookPointer)return;
   if(!lookMoved&&player.active&&player.alive){
-   const x=e.clientX,y=e.clientY,armHit=y>innerHeight*.42&&projectedArmPoints().some(p=>Math.hypot(x-p.x,y-p.y)<Math.max(58,Math.min(96,innerWidth*.22)));
-   const region=armHit?'hand':(y>innerHeight*.58&&x>innerWidth*.64?'weapon':'');
-   if(region){const now=performance.now(),same=mobileLastTap.region===region&&now-mobileLastTap.time<650&&Math.hypot(x-mobileLastTap.x,y-mobileLastTap.y)<Math.max(55,innerWidth*.14);if(same){if(region==='weapon')shoot();else throwGrenade();mobileLastTap={region:'',time:0,x:0,y:0};}else mobileLastTap={region,time:now,x,y};}else mobileLastTap={region:'',time:0,x:0,y:0};
+   const x=e.clientX,y=e.clientY;
+   const armPoints=projectTapPoints(leftArmRig,[[.88,.20,-.78],[.40,.16,-.50],[.67,.17,-.61]]);
+   const activeGun=player.weaponType==='pistol'?pistol:player.weaponType==='launcher'?launcher:weapon;
+   const gunLocals=player.weaponType==='pistol'?[[.34,-.31,-.55],[.34,-.4,-.5]]:player.weaponType==='launcher'?[[.34,-.25,-.8],[.34,-.25,-1.325]]:[[.34,-.27,-.78],[.34,-.22,-1.38],[.34,-.22,-1.64]];
+   const gunPoints=projectTapPoints(activeGun,gunLocals);
+   const nearest=points=>Math.min(...points.map(p=>Math.hypot(x-p.x,y-p.y)));
+   const armDistance=nearest(armPoints),gunDistance=nearest(gunPoints),hitRadius=Math.max(52,Math.min(82,innerWidth*.19));
+   // Classifica pelo objeto realmente tocado: arma e braço têm áreas independentes.
+   let region='';
+   if(gunDistance<=hitRadius&&gunDistance<armDistance)region='weapon';
+   else if(armDistance<=hitRadius)region='hand';
+   if(region){
+    const now=performance.now(),same=mobileLastTap.region===region&&now-mobileLastTap.time<650&&Math.hypot(x-mobileLastTap.x,y-mobileLastTap.y)<Math.max(48,innerWidth*.12);
+    if(same){if(region==='weapon')shoot();else throwGrenade();mobileLastTap={region:'',time:0,x:0,y:0};}
+    else mobileLastTap={region,time:now,x,y};
+   }else mobileLastTap={region:'',time:0,x:0,y:0};
   }
   lookPointer=null;
  };look?.addEventListener('pointerup',stopLook);look?.addEventListener('pointercancel',e=>{if(e.pointerId===lookPointer)lookPointer=null;});

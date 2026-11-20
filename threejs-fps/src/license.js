@@ -30,4 +30,4 @@ async function validateAdminGameAccess(){
   }
  }catch(error){console.warn('Não foi possível validar o acesso administrativo.',error);}
 }
-validateAdminGameAccess().then(refresh);
+window.__tacticalAccessReady=validateAdminGameAccess().then(refresh).catch(error=>{console.warn('Admin access validation failed:',error);});

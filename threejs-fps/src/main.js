@@ -439,7 +439,16 @@ function attachSoldier(bot){
  const model=cloneSkeleton(soldierTemplate);model.name='rigged-soldier';model.scale.setScalar(1.0);model.position.y=0;
  // Soldier.glb already faces -Z, the same forward direction as the player.
  model.rotation.y=0;
- model.traverse(o=>{if(o.isMesh){o.castShadow=true;o.receiveShadow=true;if(o.material){const paintAlly=(material)=>{const m=material.clone();if(bot.ally){const tag=((o.name||'')+' '+(m.name||'')).toLowerCase();if(!/skin|face|head|eye|hand/i.test(tag)){if(/shoe|boot|helmet|glove/i.test(tag))m.color?.setHex(0x080b0e);else if(/pant|trouser|leg/i.test(tag))m.color?.setHex(0x36a66a);else if(/body|shirt|torso|jacket|uniform|arm/i.test(tag))m.color?.setHex(0x236bd1);}}m.needsUpdate=true;return m;};o.material=Array.isArray(o.material)?o.material.map(paintAlly):paintAlly(o.material);}}});
+ let allyMaterialSlot=0;
+ model.traverse(o=>{if(!o.isMesh)return;o.castShadow=true;o.receiveShadow=true;if(!o.material)return;
+  const paintAlly=material=>{const m=material.clone();if(bot.ally&&m.color){
+   const tag=((o.name||'')+' '+(m.name||'')).toLowerCase(),c=material.color;
+   const r=c.r,g=c.g,b=c.b,skinLike=/skin|face|head|eye|hand/i.test(tag)||(r>g*1.16&&g>b*1.08&&r>.28&&g>.12);
+   const brightness=Math.max(r,g,b);
+   if(!skinLike){if(brightness<.22)m.color.setHex(0x080b0e);else{m.color.setHex(allyMaterialSlot%2===0?0x236bd1:0x36a66a);allyMaterialSlot++;}}
+  }m.needsUpdate=true;return m;};
+  o.material=Array.isArray(o.material)?o.material.map(paintAlly):paintAlly(o.material);
+ });
  bot.group.add(model);bot.model=model;
  // Attach a visible rifle to the soldier's hands; barrel points along the soldier's forward axis (+Z).
  const heldRifle=new THREE.Group();heldRifle.name='held-rifle';
@@ -469,7 +478,7 @@ function setBotAnimation(bot,name){
 function makeBot(index){
  const group=new THREE.Group();
  // Lightweight local fallback is replaced by the rigged animated GLB as soon as it loads.
- const fallback=new THREE.Group();fallback.name='fallback-body';group.add(fallback);
+ const fallback=new THREE.Group();fallback.name='fallback-body';fallback.rotation.y=Math.PI;group.add(fallback);
  const isAlly=index>=60;const uniform=mat(isAlly?0x236bd1:(index%2?0x59684a:0x74664d)),vestMat=mat(isAlly?0x36a66a:0x303a34),skin=mat(0x9b8067),dark=mat(isAlly?0x080b0e:0x18201f),cloth=mat(isAlly?0x111820:0x343b32);
  const torso=new THREE.Mesh(new THREE.CapsuleGeometry(.25,.52,6,12),uniform);torso.position.y=1.18;torso.scale.set(1,.95,.72);fallback.add(torso);
  const vest=new THREE.Mesh(new THREE.BoxGeometry(.54,.48,.31),vestMat);vest.position.set(0,1.2,-.025);fallback.add(vest);
@@ -811,31 +820,10 @@ function updateBots(dt){
   if(b.mixer)b.mixer.update(dt);
   const p=b.group.position;
   const dx=camera.position.x-p.x,dz=camera.position.z-p.z,dist=Math.hypot(dx,dz)||1;
-  if(!b.alerted){
-   // Detection is based on actual line of sight or close proximity, never a broad distance trigger.
-   let enemySeesPlayer=false,playerSeesEnemy=false;
-   if(dist<22){
-    const eye=p.clone().add(new THREE.Vector3(0,1.48,0));
-    const toPlayer=camera.position.clone().sub(eye),sightDistance=toPlayer.length();
-    raycaster.set(eye,toPlayer.clone().normalize());raycaster.far=sightDistance;
-    const block=raycaster.intersectObjects(world.children,true).find(hit=>hit.object.isMesh&&hit.object.visible);
-    enemySeesPlayer=!block||block.distance>sightDistance-.5;
-    if(enemySeesPlayer){
-     camera.updateMatrixWorld();
-     const toEnemy=p.clone().add(new THREE.Vector3(0,1.25,0)).sub(camera.position);
-     const viewDir=new THREE.Vector3(0,0,-1).applyQuaternion(camera.quaternion);
-     const inView=viewDir.dot(toEnemy.clone().normalize())>.94;
-     if(inView){
-      raycaster.set(camera.position,toEnemy.clone().normalize());raycaster.far=toEnemy.length();
-      const viewBlock=raycaster.intersectObjects(world.children,true).find(hit=>hit.object.isMesh&&hit.object.visible);
-      playerSeesEnemy=!viewBlock||viewBlock.distance>toEnemy.length()-.5;
-     }
-    }
-   }
-   if(dist<11||enemySeesPlayer||playerSeesEnemy){
-    b.alerted=true;b.fire=rand(.25,.65);b.burst=rand(2,4);b.strafeTimer=rand(2,4);
-   }
-  }
+  // Soldier.glb faces local -Z: rotate the whole hostile so its chest and rifle face the player.
+  b.group.rotation.y=Math.atan2(-dx,-dz);
+  // Hostiles stay in a ready stance but only open fire at close range.
+  if(!b.alerted&&dist<=13){b.alerted=true;b.fire=rand(.45,.9);b.burst=rand(2,4);b.strafeTimer=rand(2,4);}
   if(!b.alerted){setBotAnimation(b,'idle');continue;}
   // Soldiers fight from separated positions. Only a small assault element advances,
   // and it stops at a safe firing distance instead of charging the player as a mob.
@@ -856,10 +844,10 @@ function updateBots(dt){
    b.strafeTimer=rand(2.8,5.5);
   }
   // Keep the torso, rifle and muzzle aimed at the player's current position.
-  b.group.rotation.y=Math.atan2(dx,dz);
+  b.group.rotation.y=Math.atan2(-dx,-dz);
   setBotAnimation(b,'idle');
   b.group.scale.y=1;
-  fireBot(b,dt);
+  if(dist<=13)fireBot(b,dt);
  }
 }
 function updateRadar(){const root=$('radar-dots');root.innerHTML='';for(const b of bots){if(!b.alive)continue;const dx=(b.group.position.x-camera.position.x)/55*130,dz=(b.group.position.z-camera.position.z)/55*130;const dot=document.createElement('i');dot.className='radar-dot';dot.style.left='calc(50% + '+THREE.MathUtils.clamp(dx,-62,62)+'px)';dot.style.top='calc(50% + '+THREE.MathUtils.clamp(dz,-62,62)+'px)';root.append(dot);}}

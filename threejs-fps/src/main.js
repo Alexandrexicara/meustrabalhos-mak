@@ -99,6 +99,7 @@ function damageCratesInBlast(center,radius,damage){
  for(const crate of destructibleCrates){if(!crate.alive)continue;const d=Math.hypot(crate.x-center.x,crate.z-center.z);if(d<radius)damageCrate(crate,damage*(1-d/radius));}
 }
 const combatVehicles=[];const tankShells=[];const surfaceImpacts=[];
+function getDamageableUnits(){return [...bots.filter(b=>b?.alive),...combatVehicles.flatMap(v=>v.crew).filter(b=>b?.alive)];}
 function addTank(x,z){
  const tank=new THREE.Group(),olive=mat(0x46513b,.82,.25),dark=mat(0x202722,.9,.15),steel=mat(0x343b36,.5,.55);
  const hull=new THREE.Mesh(new THREE.BoxGeometry(4.2,1.05,2.55),olive);hull.position.y=.95;hull.castShadow=true;hull.receiveShadow=true;tank.add(hull);
@@ -110,7 +111,7 @@ function addTank(x,z){
  const barrel=new THREE.Mesh(new THREE.CylinderGeometry(.13,.18,2.65,12),steel);barrel.rotation.z=Math.PI/2;barrel.position.set(1.45,.06,0);turret.add(barrel);
  const muzzle=new THREE.Mesh(new THREE.TorusGeometry(.14,.035,8,16),dark);muzzle.position.set(2.77,.06,0);muzzle.rotation.y=Math.PI/2;turret.add(muzzle);
  const mantlet=new THREE.Mesh(new THREE.SphereGeometry(.28,12,10),olive);mantlet.position.set(.55,.05,0);turret.add(mantlet);
- const crew=[];for(let i=0;i<2;i++){const soldier=makeBot(40+combatVehicles.length*2+i);bots.pop();scene.remove(soldier.group);soldier.ally=false;soldier.hp.visible=false;soldier.hpbg.visible=false;soldier.group.scale.setScalar(.88);soldier.group.position.set(i?.72:-.72,2.12,i?.22:-.22);tank.add(soldier.group);const hitbox=new THREE.Mesh(new THREE.CapsuleGeometry(.42,.96,5,9),new THREE.MeshBasicMaterial({color:0xffffff,transparent:true,opacity:0,depthWrite:false,colorWrite:false,side:THREE.DoubleSide}));hitbox.position.set(0,1.08,0);hitbox.userData.crewHitbox=true;soldier.group.add(hitbox);soldier.hitbox=hitbox;if(soldierTemplate)attachSoldier(soldier);crew.push(soldier);}tank.position.set(x,0,z);tank.rotation.y=Math.PI;world.add(tank);const collider={x,z,hx:2.55,hz:1.85,top:2.1,bottom:0};colliders.push(collider);combatVehicles.push({tank,turret,barrel,wheels,crew,collider,center:new THREE.Vector3(x,0,z),phase:Math.random()*Math.PI*2,cannonCooldown:rand(2.5,4.5),fire:rand(2,4)});
+ const crew=[];for(let i=0;i<2;i++){const soldier=makeBot(40+combatVehicles.length*2+i);bots.pop();scene.remove(soldier.group);soldier.ally=false;soldier.hp.visible=false;soldier.hpbg.visible=false;soldier.group.scale.setScalar(.88);soldier.group.position.set(i?.72:-.72,2.12,i?.22:-.22);tank.add(soldier.group);const hitbox=new THREE.Mesh(new THREE.CapsuleGeometry(.52,1.3,6,10),new THREE.MeshBasicMaterial({color:0xffffff,transparent:true,opacity:0,depthWrite:false,colorWrite:false,side:THREE.DoubleSide}));hitbox.position.set(0,1.12,0);hitbox.userData.crewHitbox=true;hitbox.userData.damageOwner=soldier;soldier.group.add(hitbox);soldier.hitbox=hitbox;if(soldierTemplate)attachSoldier(soldier);crew.push(soldier);}tank.position.set(x,0,z);tank.rotation.y=Math.PI;world.add(tank);const collider={x,z,hx:2.55,hz:1.85,top:2.1,bottom:0};colliders.push(collider);combatVehicles.push({tank,turret,barrel,wheels,crew,collider,center:new THREE.Vector3(x,0,z),phase:Math.random()*Math.PI*2,cannonCooldown:rand(2.5,4.5),fire:rand(2,4)});
 }
 function createSurfaceImpact(point,normal){
  if(!point||!normal||Math.abs(normal.y)>.72)return;
@@ -125,7 +126,7 @@ function detonateTankShell(shell,point,normal=null){
  const light=new THREE.PointLight(0xff8a32,7,17);light.position.copy(center);scene.add(light);setTimeout(()=>scene.remove(light),380);
  damageCratesInBlast(center,7,230);
  const playerDistance=camera.position.distanceTo(center);if(playerDistance<6)damagePlayer(Math.max(8,Math.round(34*(1-playerDistance/7))));
- for(const bot of bots){if(!bot.alive)continue;const d=bot.group.position.distanceTo(center);if(d<5.5)damageBot(bot,Math.round(130*(1-d/5.5)),center,'TANK');}
+ for(const bot of getDamageableUnits()){const d=bot.group.getWorldPosition(new THREE.Vector3()).distanceTo(center);if(d<5.5)damageBot(bot,Math.round(130*(1-d/5.5)),center,'TANK');}
  playSound('explosion');scene.remove(shell.mesh);shell.mesh.traverse(o=>{if(o.geometry)o.geometry.dispose();if(o.material)o.material.dispose();});
 }
 function updateCombatVehicles(dt){
@@ -818,13 +819,13 @@ function shoot(){
  const tracer=new THREE.Line(tracerGeo,new THREE.LineBasicMaterial({color:0xffdf91,transparent:true,opacity:.95,blending:THREE.AdditiveBlending,depthWrite:false}));
  scene.add(tracer);setTimeout(()=>{scene.remove(tracer);tracer.geometry.dispose();tracer.material.dispose();},75);
  if(type==='launcher'){const origin=launcher.localToWorld(new THREE.Vector3(.34,-.25,-1.42));const direction=new THREE.Vector3(0,0,-1).applyQuaternion(camera.quaternion).normalize();rocketRound.visible=false;createRocketProjectile(origin,direction);}
- const hostileTargets=[...bots.filter(b=>b.alive),...combatVehicles.flatMap(v=>v.crew).filter(b=>b?.alive)];const targets=[];for(const b of hostileTargets)b.group.traverse(o=>{if(o.isMesh&&!o.userData.noHit&&o.geometry.type!=='PlaneGeometry')targets.push(o);});
+ const hostileTargets=getDamageableUnits();const targets=[];for(const b of hostileTargets){b.group.updateWorldMatrix(true,true);b.group.traverse(o=>{if(o.isMesh&&!o.userData.noHit&&o.geometry.type!=='PlaneGeometry')targets.push(o);});}
  const hit=type==='launcher'?null:raycaster.intersectObjects(targets,false)[0];
  const crateHits=raycaster.intersectObjects(destructibleCrates.filter(c=>c.alive).flatMap(c=>c.group.children),false);const crateHit=crateHits[0];
  const crewVehicle=hit?combatVehicles.find(v=>v.crew.some(s=>{let n=hit.object;while(n){if(n===s.group)return true;n=n.parent;}return false;})):null;const worldHits=raycaster.intersectObjects(world.children,true).filter(h=>h.object.isMesh&&h.object.visible);const surfaceHit=worldHits.find(h=>!destructibleCrates.some(c=>c.alive&&c.group===h.object.parent)&&!(crewVehicle&&(()=>{let n=h.object;while(n){if(n===crewVehicle.tank)return true;n=n.parent;}return false;})()));
  if(crateHit&&(!hit||crateHit.distance<hit.distance)&&(!surfaceHit||crateHit.distance<=surfaceHit.distance)){const owner=destructibleCrates.find(c=>c.alive&&c.group===crateHit.object.parent);const normal=crateHit.face?crateHit.face.normal.clone().transformDirection(crateHit.object.matrixWorld):new THREE.Vector3(0,0,1);if(owner)damageCrate(owner,type==='launcher'?100:type==='pistol'?22:28,crateHit.point,normal);if(type==='launcher'){damageCratesInBlast(crateHit.point,7,180);const blast=new THREE.Mesh(new THREE.SphereGeometry(1.15,14,10),new THREE.MeshBasicMaterial({color:0xff9a42,transparent:true,opacity:.78,depthWrite:false}));blast.position.copy(crateHit.point);scene.add(blast);explosions.push({mesh:blast,age:0});}}
  else if(surfaceHit&&(!hit||surfaceHit.distance<hit.distance)){const normal=surfaceHit.face?surfaceHit.face.normal.clone().transformDirection(surfaceHit.object.matrixWorld):new THREE.Vector3(0,0,1);createSurfaceImpact(surfaceHit.point,normal);}
- else if(hit){playSound('hit');const bot=hostileTargets.find(b=>{let node=hit.object;while(node){if(node===b.group)return true;node=node.parent;}return false;});if(bot){bot.fire=Math.min(bot.fire,.35);player.hits++;const damage=type==='pistol'?24:type==='launcher'?150:34;damageBot(bot,damage,hit.point,type==='launcher'?'ROCKET':'BULLET');if(type==='launcher'){const blast=new THREE.Mesh(new THREE.SphereGeometry(1,14,10),new THREE.MeshBasicMaterial({color:0xff9a42,transparent:true,opacity:.65,depthWrite:false}));blast.position.copy(hit.point);scene.add(blast);explosions.push({mesh:blast,age:0});for(const other of bots){const d=other.group.position.distanceTo(hit.point);if(other!==bot&&other.alive&&d<8)damageBot(other,Math.round(150*(1-d/8)),hit.point,'ROCKET');}}$('hit-marker').classList.add('show');setTimeout(()=>$('hit-marker').classList.remove('show'),100);}}
+ else if(hit){playSound('hit');const bot=hostileTargets.find(b=>{let node=hit.object;while(node){if(node===b.group)return true;node=node.parent;}return false;});if(bot){bot.fire=Math.min(bot.fire,.35);player.hits++;const damage=type==='pistol'?24:type==='launcher'?150:34;damageBot(bot,damage,hit.point,type==='launcher'?'ROCKET':'BULLET');if(type==='launcher'){const blast=new THREE.Mesh(new THREE.SphereGeometry(1,14,10),new THREE.MeshBasicMaterial({color:0xff9a42,transparent:true,opacity:.65,depthWrite:false}));blast.position.copy(hit.point);scene.add(blast);explosions.push({mesh:blast,age:0});for(const other of hostileTargets){const d=other.group.getWorldPosition(new THREE.Vector3()).distanceTo(hit.point);if(other!==bot&&other.alive&&d<8)damageBot(other,Math.round(150*(1-d/8)),hit.point,'ROCKET');}}$('hit-marker').classList.add('show');setTimeout(()=>$('hit-marker').classList.remove('show'),100);}}
  if(type==='launcher')setWeapon('rifle');
  updateHUD();
 }
@@ -886,7 +887,7 @@ function detonateGrenade(g){
  const center=g.mesh.position.clone();scene.remove(g.mesh);playSound('explosion');damageCratesInBlast(center,7,190);
  const flash=new THREE.Mesh(new THREE.SphereGeometry(.5,16,12),new THREE.MeshBasicMaterial({color:0xffa34d,transparent:true,opacity:.82,depthWrite:false}));
  flash.position.copy(center);scene.add(flash);explosions.push({mesh:flash,age:0});
- for(const bot of bots){if(!bot.alive)continue;const target=bot.group.position.clone().add(new THREE.Vector3(0,.85,0));const d=target.distanceTo(center);if(d<9){const damage=Math.max(0,Math.round(190*Math.pow(1-d/9,1.35)));if(damage>0)damageBot(bot,damage,target,'FRAG');}}
+ for(const bot of getDamageableUnits()){const target=bot.group.getWorldPosition(new THREE.Vector3()).add(new THREE.Vector3(0,.85,0));const d=target.distanceTo(center);if(d<9){const damage=Math.max(0,Math.round(190*Math.pow(1-d/9,1.35)));if(damage>0)damageBot(bot,damage,target,'FRAG');}}
  if(camera.position.distanceTo(center)<5.5)damagePlayer(Math.round(30*(1-camera.position.distanceTo(center)/7)));
  updateHUD();
 }

@@ -95,18 +95,52 @@ function damageCrate(crate,amount,point,normal){
 function damageCratesInBlast(center,radius,damage){
  for(const crate of destructibleCrates){if(!crate.alive)continue;const d=Math.hypot(crate.x-center.x,crate.z-center.z);if(d<radius)damageCrate(crate,damage*(1-d/radius));}
 }
-const combatVehicles=[];
+const combatVehicles=[];const tankShells=[];const surfaceImpacts=[];
 function addTank(x,z){
  const tank=new THREE.Group(),olive=mat(0x46513b,.82,.25),dark=mat(0x202722,.9,.15),steel=mat(0x343b36,.5,.55);
- const hull=new THREE.Mesh(new THREE.BoxGeometry(4.2,1.05,2.55),olive);hull.position.y=.95;hull.castShadow=true;tank.add(hull);
+ const hull=new THREE.Mesh(new THREE.BoxGeometry(4.2,1.05,2.55),olive);hull.position.y=.95;hull.castShadow=true;hull.receiveShadow=true;tank.add(hull);
  const glacis=new THREE.Mesh(new THREE.BoxGeometry(3.7,.48,2.5),olive);glacis.position.set(0,1.55,.05);glacis.rotation.x=-.12;tank.add(glacis);
- for(const side of [-1,1]){const track=new THREE.Mesh(new THREE.BoxGeometry(4.55,.72,.48),dark);track.position.set(0,.55,side*1.42);tank.add(track);for(let n=0;n<6;n++){const wheel=new THREE.Mesh(new THREE.CylinderGeometry(.32,.32,.18,16),steel);wheel.rotation.x=Math.PI/2;wheel.position.set(-1.65+n*.66,.55,side*1.69);tank.add(wheel);}}
+ const wheels=[];
+ for(const side of [-1,1]){const track=new THREE.Mesh(new THREE.BoxGeometry(4.55,.72,.48),dark);track.position.set(0,.55,side*1.42);tank.add(track);for(let n=0;n<6;n++){const wheel=new THREE.Mesh(new THREE.CylinderGeometry(.32,.32,.18,16),steel);wheel.rotation.x=Math.PI/2;wheel.position.set(-1.65+n*.66,.55,side*1.69);tank.add(wheel);wheels.push(wheel);}}
  const turret=new THREE.Group();turret.position.set(-.15,1.8,0);tank.add(turret);
  const body=new THREE.Mesh(new THREE.CylinderGeometry(.98,1.15,.62,8),olive);body.scale.z=.82;body.castShadow=true;turret.add(body);
  const barrel=new THREE.Mesh(new THREE.CylinderGeometry(.13,.18,2.65,12),steel);barrel.rotation.z=Math.PI/2;barrel.position.set(1.45,.06,0);turret.add(barrel);
+ const muzzle=new THREE.Mesh(new THREE.TorusGeometry(.14,.035,8,16),dark);muzzle.position.set(2.77,.06,0);muzzle.rotation.y=Math.PI/2;turret.add(muzzle);
  const mantlet=new THREE.Mesh(new THREE.SphereGeometry(.28,12,10),olive);mantlet.position.set(.55,.05,0);turret.add(mantlet);
- tank.position.set(x,0,z);tank.rotation.y=Math.PI;world.add(tank);combatVehicles.push({tank,turret,fire:rand(2,4)});
- colliders.push({x,z,hx:2.55,hz:1.85,top:2.1});
+ const crew=makeBot(40+combatVehicles.length);bots.pop();scene.remove(crew.group);crew.ally=false;crew.hp.visible=false;crew.hpbg.visible=false;crew.group.scale.setScalar(.88);crew.group.position.set(0,2.12,0);tank.add(crew.group);if(soldierTemplate)attachSoldier(crew);
+ tank.position.set(x,0,z);tank.rotation.y=Math.PI;world.add(tank);
+ const collider={x,z,hx:2.55,hz:1.85,top:2.1};colliders.push(collider);
+ combatVehicles.push({tank,turret,barrel,wheels,crew,collider,center:new THREE.Vector3(x,0,z),phase:Math.random()*Math.PI*2,cannonCooldown:rand(2.5,4.5),fire:rand(2,4)});
+}
+function createSurfaceImpact(point,normal){
+ if(!point||!normal||Math.abs(normal.y)>.72)return;
+ const mark=new THREE.Group();mark.position.copy(point).addScaledVector(normal,.014);mark.quaternion.setFromUnitVectors(new THREE.Vector3(0,0,1),normal.clone().normalize());
+ const soot=new THREE.Mesh(new THREE.CircleGeometry(rand(.045,.085),10),new THREE.MeshBasicMaterial({color:0x171713,transparent:true,opacity:.9,depthWrite:false,side:THREE.DoubleSide}));mark.add(soot);
+ for(let i=0;i<3;i++){const scratch=new THREE.Mesh(new THREE.BoxGeometry(.012,rand(.07,.16),.006),new THREE.MeshBasicMaterial({color:i===0?0x26231d:0x4b463b,side:THREE.DoubleSide}));scratch.position.set(rand(-.09,.09),rand(-.08,.08),.003);scratch.rotation.z=rand(-1.1,1.1);mark.add(scratch);}
+ world.add(mark);surfaceImpacts.push(mark);if(surfaceImpacts.length>220){const old=surfaceImpacts.shift();world.remove(old);old.traverse(o=>{if(o.geometry)o.geometry.dispose();if(o.material)o.material.dispose();});}
+}
+function detonateTankShell(shell,point,normal=null){
+ const center=point.clone();if(normal)createSurfaceImpact(center,normal);
+ const blast=new THREE.Mesh(new THREE.SphereGeometry(1.25,18,14),new THREE.MeshBasicMaterial({color:0xff8a32,transparent:true,opacity:.92,depthWrite:false,blending:THREE.AdditiveBlending}));blast.position.copy(center);scene.add(blast);explosions.push({mesh:blast,age:0});
+ const light=new THREE.PointLight(0xff8a32,7,17);light.position.copy(center);scene.add(light);setTimeout(()=>scene.remove(light),380);
+ damageCratesInBlast(center,7,230);
+ const playerDistance=camera.position.distanceTo(center);if(playerDistance<6)damagePlayer(Math.max(8,Math.round(34*(1-playerDistance/7))));
+ for(const bot of bots){if(!bot.alive)continue;const d=bot.group.position.distanceTo(center);if(d<5.5)damageBot(bot,Math.round(130*(1-d/5.5)),center,'TANK');}
+ playSound('explosion');scene.remove(shell.mesh);shell.mesh.traverse(o=>{if(o.geometry)o.geometry.dispose();if(o.material)o.material.dispose();});
+}
+function updateCombatVehicles(dt){
+ for(const v of combatVehicles){
+  if(player.active)v.phase+=dt*.22;const oldX=v.tank.position.x,oldZ=v.tank.position.z;
+  if(player.active){v.tank.position.x=v.center.x+Math.cos(v.phase)*2.7;v.tank.position.z=v.center.z+Math.sin(v.phase)*1.9;}
+  const dx=v.tank.position.x-oldX,dz=v.tank.position.z-oldZ;if(Math.hypot(dx,dz)>.0001)v.tank.rotation.y=Math.atan2(-dx,-dz);
+  v.collider.x=v.tank.position.x;v.collider.z=v.tank.position.z;
+  for(const wheel of v.wheels)wheel.rotation.z+=dt*2.8;
+  const toPlayer=camera.position.clone().sub(v.tank.position),local=toPlayer.clone().applyAxisAngle(new THREE.Vector3(0,1,0),-v.tank.rotation.y);v.turret.rotation.y=Math.atan2(-local.z,local.x);
+  if(v.crew?.mixer)v.crew.mixer.update(dt);if(v.crew?.alive&&player.active){const crewDx=camera.position.x-v.tank.position.x,crewDz=camera.position.z-v.tank.position.z;v.crew.group.rotation.y=Math.atan2(-crewDx,-crewDz)-v.tank.rotation.y;updateHeldRifle(v.crew);fireBot(v.crew,dt);}
+  v.cannonCooldown-=dt;
+  if(v.cannonCooldown<=0&&player.active&&player.alive){v.cannonCooldown=rand(5.2,7.8);v.tank.updateMatrixWorld(true);v.turret.updateMatrixWorld(true);const start=v.turret.localToWorld(new THREE.Vector3(2.9,.06,0));const direction=new THREE.Vector3(1,0,0).applyQuaternion(v.turret.getWorldQuaternion(new THREE.Quaternion())).normalize();const shellMesh=new THREE.Group();const core=new THREE.Mesh(new THREE.SphereGeometry(.16,12,10),new THREE.MeshBasicMaterial({color:0xffc16a,emissive:0xff5a16}));shellMesh.add(core);const tail=new THREE.Mesh(new THREE.CylinderGeometry(.055,.09,.42,8),new THREE.MeshBasicMaterial({color:0xff7b26,transparent:true,opacity:.8}));tail.rotation.x=Math.PI/2;tail.position.z=.24;shellMesh.add(tail);shellMesh.position.copy(start);shellMesh.quaternion.setFromUnitVectors(new THREE.Vector3(0,0,-1),direction);scene.add(shellMesh);tankShells.push({mesh:shellMesh,velocity:direction.multiplyScalar(30).add(new THREE.Vector3(0,3.2,0)),life:3.5});playSound('explosion');}
+ }
+ for(let i=tankShells.length-1;i>=0;i--){const shell=tankShells[i],previous=shell.mesh.position.clone();shell.velocity.y-=7.8*dt;const step=shell.velocity.clone().multiplyScalar(dt),distance=step.length();shell.mesh.position.add(step);shell.mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0,0,-1),shell.velocity.clone().normalize());shell.life-=dt;if(distance>0){raycaster.set(previous,step.clone().normalize());raycaster.far=distance;const hit=raycaster.intersectObjects(world.children,true).find(h=>h.object.isMesh&&h.object.visible);if(hit&&hit.distance<=distance+.08){detonateTankShell(shell,hit.point,hit.face?hit.face.normal.clone().transformDirection(hit.object.matrixWorld):null);tankShells.splice(i,1);continue;}}if(shell.mesh.position.distanceTo(camera.position)<.72){detonateTankShell(shell,shell.mesh.position);tankShells.splice(i,1);continue;}if(shell.life<=0||shell.mesh.position.y<.12){detonateTankShell(shell,shell.mesh.position);tankShells.splice(i,1);}}
 }
 const mapThemes=[
  {name:'OLD TOWN // URBAN WARZONE',sky:0x89999a,fog:0x89999a,ground:0x777363,wall:0x66716c,accent:0x687d59},
@@ -433,6 +467,7 @@ soldierLoader.load('https://threejs.org/examples/models/gltf/Soldier.glb',gltf=>
  soldierTemplate=gltf.scene;soldierClips=gltf.animations||[];
  for(const bot of bots)attachSoldier(bot);
  for(const ally of allies)attachSoldier(ally);
+ for(const vehicle of combatVehicles)if(vehicle.crew)attachSoldier(vehicle.crew);
 },undefined,error=>console.warn('Soldier model unavailable; using local fallback:',error));
 function attachSoldier(bot){
  if(!soldierTemplate||!bot.alive)return;
@@ -735,7 +770,9 @@ function shoot(){
  const targets=[];for(const b of bots)if(b.alive)b.group.traverse(o=>{if(o.isMesh&&!o.userData.noHit&&o.geometry.type!=='PlaneGeometry')targets.push(o);});
  const hit=type==='launcher'?null:raycaster.intersectObjects(targets,false)[0];
  const crateHits=raycaster.intersectObjects(destructibleCrates.filter(c=>c.alive).flatMap(c=>c.group.children),false);const crateHit=crateHits[0];
- if(crateHit&&(!hit||crateHit.distance<hit.distance)){const owner=destructibleCrates.find(c=>c.alive&&c.group===crateHit.object.parent);const normal=crateHit.face?crateHit.face.normal.clone().transformDirection(crateHit.object.matrixWorld):new THREE.Vector3(0,0,1);if(owner)damageCrate(owner,type==='launcher'?100:type==='pistol'?7:12,crateHit.point,normal);if(type==='launcher'){damageCratesInBlast(crateHit.point,7,150);const blast=new THREE.Mesh(new THREE.SphereGeometry(.8,14,10),new THREE.MeshBasicMaterial({color:0xff9a42,transparent:true,opacity:.65,depthWrite:false}));blast.position.copy(crateHit.point);scene.add(blast);explosions.push({mesh:blast,age:0});}}
+ const worldHits=raycaster.intersectObjects(world.children,true).filter(h=>h.object.isMesh&&h.object.visible);const surfaceHit=worldHits.find(h=>!destructibleCrates.some(c=>c.alive&&c.group===h.object.parent));
+ if(crateHit&&(!hit||crateHit.distance<hit.distance)&&(!surfaceHit||crateHit.distance<=surfaceHit.distance)){const owner=destructibleCrates.find(c=>c.alive&&c.group===crateHit.object.parent);const normal=crateHit.face?crateHit.face.normal.clone().transformDirection(crateHit.object.matrixWorld):new THREE.Vector3(0,0,1);if(owner)damageCrate(owner,type==='launcher'?100:type==='pistol'?22:28,crateHit.point,normal);if(type==='launcher'){damageCratesInBlast(crateHit.point,7,180);const blast=new THREE.Mesh(new THREE.SphereGeometry(1.15,14,10),new THREE.MeshBasicMaterial({color:0xff9a42,transparent:true,opacity:.78,depthWrite:false}));blast.position.copy(crateHit.point);scene.add(blast);explosions.push({mesh:blast,age:0});}}
+ else if(surfaceHit&&(!hit||surfaceHit.distance<hit.distance)){const normal=surfaceHit.face?surfaceHit.face.normal.clone().transformDirection(surfaceHit.object.matrixWorld):new THREE.Vector3(0,0,1);createSurfaceImpact(surfaceHit.point,normal);}
  else if(hit){playSound('hit');const bot=bots.find(b=>{if(!b.alive)return false;let node=hit.object;while(node){if(node===b.group)return true;node=node.parent;}return false;});if(bot){bot.fire=Math.min(bot.fire,.35);player.hits++;const damage=type==='pistol'?24:type==='launcher'?150:34;damageBot(bot,damage,hit.point,type==='launcher'?'ROCKET':'BULLET');if(type==='launcher'){const blast=new THREE.Mesh(new THREE.SphereGeometry(1,14,10),new THREE.MeshBasicMaterial({color:0xff9a42,transparent:true,opacity:.65,depthWrite:false}));blast.position.copy(hit.point);scene.add(blast);explosions.push({mesh:blast,age:0});for(const other of bots){const d=other.group.position.distanceTo(hit.point);if(other!==bot&&other.alive&&d<8)damageBot(other,Math.round(150*(1-d/8)),hit.point,'ROCKET');}}$('hit-marker').classList.add('show');setTimeout(()=>$('hit-marker').classList.remove('show'),100);}}
  if(type==='launcher')setWeapon('rifle');
  updateHUD();
@@ -789,7 +826,7 @@ function updateProjectiles(dt){
  }
  for(let i=enemyBullets.length-1;i>=0;i--){const b=enemyBullets[i];const previous=b.mesh.position.clone();const step=b.velocity.clone().multiplyScalar(dt);const stepLength=step.length();b.mesh.position.add(step);b.life-=dt;
   // Stop each projectile at the first solid map surface, not only at the firing moment.
-  if(stepLength>0){raycaster.set(previous,step.clone().normalize());raycaster.far=stepLength;const block=raycaster.intersectObjects(world.children,true).find(hit=>hit.object.isMesh&&hit.object.visible);if(block&&block.distance<stepLength+.04)b.life=-1;}
+  if(stepLength>0){raycaster.set(previous,step.clone().normalize());raycaster.far=stepLength;const block=raycaster.intersectObjects(world.children,true).find(hit=>hit.object.isMesh&&hit.object.visible);if(block&&block.distance<stepLength+.04){const normal=block.face?block.face.normal.clone().transformDirection(block.object.matrixWorld):null;createSurfaceImpact(block.point,normal);b.life=-1;}}
   if(b.mesh.position.distanceTo(camera.position)<.48){damagePlayer(b.damage);b.life=-1;}
   if(b.life<=0){scene.remove(b.mesh);enemyBullets.splice(i,1);}
  }
@@ -905,7 +942,7 @@ function update(dt){
  elapsed+=dt;patrolAircraft.position.x=((elapsed*2.2+48)%110)-55;patrolAircraft.position.y=15+Math.sin(elapsed*.55)*.65;patrolAircraft.position.z=-27+Math.sin(elapsed*.24)*7;patrolAircraft.rotation.y=Math.PI+Math.sin(elapsed*.24)*.12;mainRotor.rotation.y+=dt*34;tailRotor.rotation.x+=dt*29;
  heliAttack-=dt;if(heliAttack<=0&&player.active&&player.alive){heliAttack=rand(2.2,3.5);const origin=patrolAircraft.position.clone().add(new THREE.Vector3(1,-.4,0));const target=camera.position.clone().add(new THREE.Vector3(rand(-1.5,1.5),0,rand(-1.5,1.5)));const dir=target.sub(origin).normalize();const bolt=new THREE.Mesh(new THREE.CylinderGeometry(.045,.045,.85,6),new THREE.MeshBasicMaterial({color:0xffb45e,emissive:0xff5522}));bolt.position.copy(origin);bolt.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0),dir);scene.add(bolt);heliBullets.push({mesh:bolt,velocity:dir.multiplyScalar(27),life:2.2});}
  for(let i=heliBullets.length-1;i>=0;i--){const b=heliBullets[i];b.mesh.position.addScaledVector(b.velocity,dt);b.life-=dt;if(b.mesh.position.distanceTo(camera.position)<.65){damagePlayer(10);b.life=-1;}if(b.life<=0){scene.remove(b.mesh);heliBullets.splice(i,1);}}
- for(const v of combatVehicles){v.fire-=dt;const target=new THREE.Vector3(camera.position.x-v.tank.position.x,0,camera.position.z-v.tank.position.z);v.turret.rotation.y=Math.atan2(target.x,target.z)-v.tank.rotation.y;if(v.fire<=0&&player.active){v.fire=rand(4,7);const start=v.tank.position.clone().add(new THREE.Vector3(0,2,0));const dir=new THREE.Vector3(camera.position.x-start.x,camera.position.y-start.y,camera.position.z-start.z).normalize();const shell=new THREE.Mesh(new THREE.SphereGeometry(.13,8,6),new THREE.MeshBasicMaterial({color:0xffa34d}));shell.position.copy(start);scene.add(shell);enemyBullets.push({mesh:shell,velocity:dir.multiplyScalar(22),life:1.8,damage:16});}}
+ updateCombatVehicles(dt);
  updateRocketProjectiles(dt);shotCooldown=Math.max(0,shotCooldown-dt);recoil=Math.max(0,recoil-dt*.55);if(isTouchDevice&&mobileFiring&&player.active)shoot();
  if(player.active&&player.alive){
   if(!routeActive){roundTime-=dt;if(roundTime<=0){roundTime=0;damagePlayer(12);roundTime=12;}updateTimer();}

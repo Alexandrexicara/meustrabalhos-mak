@@ -4,6 +4,9 @@ import { clone as cloneSkeleton } from 'three/addons/utils/SkeletonUtils.js';
 import './style.css';
 
 const canvas = document.querySelector('#game');
+let resolveTacticalGameReady=null;
+window.__tacticalGameReady=new Promise(resolve=>{resolveTacticalGameReady=resolve;});
+window.__tacticalMarkGameReady=()=>{if(resolveTacticalGameReady){resolveTacticalGameReady();resolveTacticalGameReady=null;}};
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x89999a);
 scene.fog = new THREE.Fog(0x89999a, 22, 78);

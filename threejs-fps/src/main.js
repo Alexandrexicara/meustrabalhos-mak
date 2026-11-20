@@ -439,7 +439,7 @@ function attachSoldier(bot){
  const model=cloneSkeleton(soldierTemplate);model.name='rigged-soldier';model.scale.setScalar(1.0);model.position.y=0;
  // Soldier.glb already faces -Z, the same forward direction as the player.
  model.rotation.y=0;
- model.traverse(o=>{if(o.isMesh){o.castShadow=true;o.receiveShadow=true;if(o.material){o.material=o.material.clone();}}});
+ model.traverse(o=>{if(o.isMesh){o.castShadow=true;o.receiveShadow=true;if(o.material){const paintAlly=(material)=>{const m=material.clone();if(bot.ally){const tag=((o.name||'')+' '+(m.name||'')).toLowerCase();if(!/skin|face|head|eye|hand/i.test(tag)){if(/shoe|boot|helmet|glove/i.test(tag))m.color?.setHex(0x080b0e);else if(/pant|trouser|leg/i.test(tag))m.color?.setHex(0x36a66a);else if(/body|shirt|torso|jacket|uniform|arm/i.test(tag))m.color?.setHex(0x236bd1);}}m.needsUpdate=true;return m;};o.material=Array.isArray(o.material)?o.material.map(paintAlly):paintAlly(o.material);}}});
  bot.group.add(model);bot.model=model;
  // Attach a visible rifle to the soldier's hands; barrel points along the soldier's forward axis (+Z).
  const heldRifle=new THREE.Group();heldRifle.name='held-rifle';

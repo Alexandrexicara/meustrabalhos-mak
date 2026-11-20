@@ -164,8 +164,12 @@ $('admin-login-form').addEventListener('submit', async event => {
 });
 $('admin-refresh').addEventListener('click', loadPlayers);
 async function launchAdminGame(destination = '/') {
-  const data = await api('/api/admin/game-access', { method: 'POST', body: '{}' });
-  sessionStorage.setItem('tacticalStrikeAdminGameToken', data.token);
+  // O painel já validou a sessão administrativa. Reutilize essa mesma sessão no jogo;
+  // não solicite uma segunda licença nem gere um segundo token.
+  if (!adminToken || sessionStorage.getItem('tacticalStrikeAdminToken') !== adminToken) {
+    throw new Error('Sessão administrativa não encontrada. Entre novamente no painel.');
+  }
+  sessionStorage.setItem('tacticalStrikeAdminGameToken', adminToken);
   window.location.assign(destination);
 }
 

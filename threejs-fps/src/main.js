@@ -532,8 +532,21 @@ function updateAllies(dt){
   const dx=desiredX-a.group.position.x,dz=desiredZ-a.group.position.z,dist=Math.hypot(dx,dz);
   if(dist>1.15){const step=Math.min(dist-1.05,a.speed*1.65*dt);const nx=a.group.position.x+dx/dist*step,nz=a.group.position.z+dz/dist*step;a.group.rotation.y=Math.atan2(-dx,-dz);if(!moveBlocked(nx,a.group.position.z))a.group.position.x=nx;if(!moveBlocked(a.group.position.x,nz))a.group.position.z=nz;setBotAnimation(a,'run');}
   else setBotAnimation(a,'idle');
+  // Allies cover the flanks. Hostiles in the player's forward field are reserved
+  // for the player to engage, so squad support never clears the main sightline.
+  const playerForward=new THREE.Vector3(0,0,-1).applyAxisAngle(new THREE.Vector3(0,1,0),camera.rotation.y);
   let target=null,best=32;
-  for(const enemy of bots){if(!enemy.alive)continue;const d=a.group.position.distanceTo(enemy.group.position);if(d<best){best=d;target=enemy;}}
+  for(const enemy of bots){
+   if(!enemy.alive)continue;
+   const fromPlayer=enemy.group.position.clone().sub(camera.position);fromPlayer.y=0;
+   const playerDistance=fromPlayer.length();
+   if(playerDistance>0.001){
+    const forwardDot=playerForward.dot(fromPlayer.normalize());
+    if(forwardDot>0.48)continue;
+   }
+   const d=a.group.position.distanceTo(enemy.group.position);
+   if(d<best){best=d;target=enemy;}
+  }
   if(target){
    const aim=target.group.position.clone().add(new THREE.Vector3(0,1.25,0)),origin=a.group.position.clone().add(new THREE.Vector3(0,1.42,0)),delta=aim.clone().sub(origin),distance=delta.length();
    a.group.rotation.y=Math.atan2(-delta.x,-delta.z);a.fire-=dt;

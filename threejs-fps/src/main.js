@@ -760,7 +760,7 @@ function movePlayerHorizontal(dx,dz){
 }
 function damagePlayer(amount){if(!player.alive)return;playSound('damage');player.health=Math.max(0,player.health-amount);$('damage-flash').classList.add('show');setTimeout(()=>$('damage-flash').classList.remove('show'),100);updateHUD();if(player.health<=0){player.alive=false;player.active=false;document.exitPointerLock?.();$('gameover-copy').textContent='You neutralized '+player.kills+' hostiles across '+player.round+' rounds.';gameoverScreen.classList.remove('hidden');}}
 function fireBot(bot,dt){
- bot.fire-=dt;if(bot.fire>0)return;bot.fire=rand(.72,1.18);
+ bot.fire-=dt;if(bot.fire>0)return;bot.fire=rand(1.15,1.65);
  const origin=bot.heldRifle?bot.heldRifle.localToWorld(new THREE.Vector3(0,0,.94)):bot.group.localToWorld(new THREE.Vector3(0,1.32,.42));
  const target=camera.position.clone().add(new THREE.Vector3(rand(-.9,.9),rand(-.55,.55),rand(-.9,.9)));
  const delta=target.clone().sub(origin),distance=delta.length(),direction=delta.normalize();
@@ -771,7 +771,7 @@ function fireBot(bot,dt){
  if(bot.heldRifle){const flash=new THREE.Mesh(new THREE.SphereGeometry(.065,8,6),new THREE.MeshBasicMaterial({color:0xffc16a,transparent:true,opacity:.98,blending:THREE.AdditiveBlending,depthWrite:false}));flash.position.set(0,0,.96);bot.heldRifle.add(flash);setTimeout(()=>{bot.heldRifle?.remove(flash);flash.geometry.dispose();flash.material.dispose();},65);}
  const tracer=new THREE.Mesh(new THREE.CylinderGeometry(.014,.014,.58,6),new THREE.MeshBasicMaterial({color:0xffb36b,emissive:0x8b3a12}));
  tracer.position.copy(origin);tracer.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0),direction);scene.add(tracer);
- enemyBullets.push({mesh:tracer,velocity:direction.clone().multiplyScalar(36),life:Math.min(1.15,distance/36+.08),damage:rand(4,7)});
+ enemyBullets.push({mesh:tracer,velocity:direction.clone().multiplyScalar(36),life:Math.min(1.15,distance/36+.08),damage:rand(2,3)});
  playSound('enemy');
 }
 function spawnBlood(position){
@@ -825,7 +825,7 @@ function shoot(){
  const crewVehicle=hit?combatVehicles.find(v=>v.crew.some(s=>{let n=hit.object;while(n){if(n===s.group)return true;n=n.parent;}return false;})):null;const worldHits=raycaster.intersectObjects(world.children,true).filter(h=>h.object.isMesh&&h.object.visible);const surfaceHit=worldHits.find(h=>!destructibleCrates.some(c=>c.alive&&c.group===h.object.parent)&&!(crewVehicle&&(()=>{let n=h.object;while(n){if(n===crewVehicle.tank)return true;n=n.parent;}return false;})()));
  if(crateHit&&(!hit||crateHit.distance<hit.distance)&&(!surfaceHit||crateHit.distance<=surfaceHit.distance)){const owner=destructibleCrates.find(c=>c.alive&&c.group===crateHit.object.parent);const normal=crateHit.face?crateHit.face.normal.clone().transformDirection(crateHit.object.matrixWorld):new THREE.Vector3(0,0,1);if(owner)damageCrate(owner,type==='launcher'?100:type==='pistol'?22:28,crateHit.point,normal);if(type==='launcher'){damageCratesInBlast(crateHit.point,7,180);const blast=new THREE.Mesh(new THREE.SphereGeometry(1.15,14,10),new THREE.MeshBasicMaterial({color:0xff9a42,transparent:true,opacity:.78,depthWrite:false}));blast.position.copy(crateHit.point);scene.add(blast);explosions.push({mesh:blast,age:0});}}
  else if(surfaceHit&&(!hit||surfaceHit.distance<hit.distance)){const normal=surfaceHit.face?surfaceHit.face.normal.clone().transformDirection(surfaceHit.object.matrixWorld):new THREE.Vector3(0,0,1);createSurfaceImpact(surfaceHit.point,normal);}
- else if(hit){playSound('hit');const bot=hostileTargets.find(b=>{let node=hit.object;while(node){if(node===b.group)return true;node=node.parent;}return false;});if(bot){bot.fire=Math.min(bot.fire,.35);player.hits++;const damage=type==='pistol'?24:type==='launcher'?150:34;damageBot(bot,damage,hit.point,type==='launcher'?'ROCKET':'BULLET');if(type==='launcher'){const blast=new THREE.Mesh(new THREE.SphereGeometry(1,14,10),new THREE.MeshBasicMaterial({color:0xff9a42,transparent:true,opacity:.65,depthWrite:false}));blast.position.copy(hit.point);scene.add(blast);explosions.push({mesh:blast,age:0});for(const other of hostileTargets){const d=other.group.getWorldPosition(new THREE.Vector3()).distanceTo(hit.point);if(other!==bot&&other.alive&&d<8)damageBot(other,Math.round(150*(1-d/8)),hit.point,'ROCKET');}}$('hit-marker').classList.add('show');setTimeout(()=>$('hit-marker').classList.remove('show'),100);}}
+ else if(hit){playSound('hit');const bot=hostileTargets.find(b=>{let node=hit.object;while(node){if(node===b.group)return true;node=node.parent;}return false;});if(bot){bot.fire=Math.min(bot.fire,.35);player.hits++;const damage=type==='pistol'?50:type==='launcher'?150:50;damageBot(bot,damage,hit.point,type==='launcher'?'ROCKET':'BULLET');if(type==='launcher'){const blast=new THREE.Mesh(new THREE.SphereGeometry(1,14,10),new THREE.MeshBasicMaterial({color:0xff9a42,transparent:true,opacity:.65,depthWrite:false}));blast.position.copy(hit.point);scene.add(blast);explosions.push({mesh:blast,age:0});for(const other of hostileTargets){const d=other.group.getWorldPosition(new THREE.Vector3()).distanceTo(hit.point);if(other!==bot&&other.alive&&d<8)damageBot(other,Math.round(150*(1-d/8)),hit.point,'ROCKET');}}$('hit-marker').classList.add('show');setTimeout(()=>$('hit-marker').classList.remove('show'),100);}}
  if(type==='launcher')setWeapon('rifle');
  updateHUD();
 }

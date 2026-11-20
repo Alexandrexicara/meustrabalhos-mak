@@ -727,7 +727,17 @@ function updateHUD(){
  $('radar-count').textContent=String(bots.filter(b=>b.alive).length).padStart(2,'0');$('wave').textContent=String(bots.filter(b=>b.alive).length).padStart(2,'0');
  const bars=$('ammo-bars');bars.innerHTML='';const cap=player.weaponType==='pistol'?12:player.weaponType==='launcher'?1:30;const barLoaded=player.weaponType==='pistol'?player.pistolAmmo:player.weaponType==='launcher'?player.rocketAmmo:player.ammo;for(let i=0;i<cap;i++){const el=document.createElement('i');if(i>=barLoaded)el.className='empty';bars.append(el);}
 }
-function moveBlocked(x,z){if(Math.abs(x)>mapBounds||Math.abs(z)>mapBounds)return true;return colliders.some(c=>Math.abs(x-c.x)<c.hx+.42&&Math.abs(z-c.z)<c.hz+.42&&(!onRooftop||camera.position.y<roofTopHeight+1.0));}
+function moveBlocked(x,z){
+ if(Math.abs(x)>mapBounds||Math.abs(z)>mapBounds)return true;
+ // Keep a clear ground-level approach lane beside the east wall of the rooftop.
+ // The roof slab used to block the player before the ladder trigger could engage.
+ const ladderApproach=x>ladderPosition.x-.58&&x<ladderPosition.x+1.75&&z>ladderPosition.z-3.15&&z<ladderPosition.z+3.15;
+ return colliders.some(c=>{
+  const isLadderRoof=c.top>roofTopHeight-.05&&Math.abs(c.x)<.01&&Math.abs(c.z+17)<.01;
+  if(ladderApproach&&isLadderRoof)return false;
+  return Math.abs(x-c.x)<c.hx+.42&&Math.abs(z-c.z)<c.hz+.42&&(!onRooftop||camera.position.y<roofTopHeight+1.0);
+ });
+}
 function damagePlayer(amount){if(!player.alive)return;playSound('damage');player.health=Math.max(0,player.health-amount);$('damage-flash').classList.add('show');setTimeout(()=>$('damage-flash').classList.remove('show'),100);updateHUD();if(player.health<=0){player.alive=false;player.active=false;document.exitPointerLock?.();$('gameover-copy').textContent='You neutralized '+player.kills+' hostiles across '+player.round+' rounds.';gameoverScreen.classList.remove('hidden');}}
 function fireBot(bot,dt){
  bot.fire-=dt;if(bot.fire>0)return;bot.fire=rand(.72,1.18);
@@ -998,7 +1008,7 @@ function update(dt){
    if(move.lengthSq()>0){if(elapsed-lastStepSound>.38){playSound('step');lastStepSound=elapsed;}move.normalize();const speed=(keys.ShiftLeft||keys.ShiftRight)?8.5:5.2;const nx=camera.position.x+move.x*speed*dt,nz=camera.position.z+move.z*speed*dt;
     if(onRooftop){const leavesRoof=nx<roofBounds.minX||nx>roofBounds.maxX||nz<roofBounds.minZ||nz>roofBounds.maxZ;if(leavesRoof){camera.position.x=nx;camera.position.z=nz;onRooftop=false;player.onGround=false;player.velocity.y=-.7;toast('SAINDO DA LAJE // QUEDA');}else{if(!moveBlocked(nx,camera.position.z))camera.position.x=nx;if(!moveBlocked(camera.position.x,nz))camera.position.z=nz;}}
     else{if(!moveBlocked(nx,camera.position.z))camera.position.x=nx;if(!moveBlocked(camera.position.x,nz))camera.position.z=nz;}bob+=dt*speed;}
-   const nearLadderGround=Math.hypot(camera.position.x-ladderPosition.x,camera.position.z-(ladderPosition.z-1.05))<2.25;
+   const nearLadderGround=Math.hypot(camera.position.x-ladderPosition.x,camera.position.z-(ladderPosition.z-1.05))<2.8;
    const nearLadderRoof=onRooftop&&Math.hypot(camera.position.x-5.85,camera.position.z-ladderPosition.z)<2.1;
    if(player.onGround&&!onRooftop&&nearLadderGround)beginLadderClimb('up');
    else if(keys.KeyE&&nearLadderRoof)beginLadderClimb('down');

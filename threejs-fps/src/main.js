@@ -434,6 +434,8 @@ soldierLoader.load('https://threejs.org/examples/models/gltf/Soldier.glb',gltf=>
  for(const bot of bots)attachSoldier(bot);
 },undefined,error=>console.warn('Soldier model unavailable; using local fallback:',error));
 function attachSoldier(bot){
+ // Friendly operators keep the purpose-built blue/green/black model: its arms are posed around the rifle. The GLB idle animation lowers its arms and obscures the weapon grip.
+ if(bot.ally)return;
  if(!soldierTemplate||!bot.alive)return;
  const old=bot.group.getObjectByName('fallback-body');if(old)bot.group.remove(old);
  const model=cloneSkeleton(soldierTemplate);model.name='rigged-soldier';model.scale.setScalar(1.0);model.position.y=0;
@@ -546,7 +548,8 @@ function updateAllies(dt){
    const playerDistance=fromPlayer.length();
    if(playerDistance>0.001){
     const forwardDot=playerForward.dot(fromPlayer.normalize());
-    if(forwardDot>0.48)continue;
+    // Squad fire is reserved for lateral threats only. Enemies in front (or directly behind) remain outside the allies' target sector.
+    if(Math.abs(forwardDot)>0.62)continue;
    }
    const d=a.group.position.distanceTo(enemy.group.position);
    if(d<best){best=d;target=enemy;}

@@ -509,7 +509,7 @@ function makeBot(index){
  }
  if(!spawn)spawn=bestCandidate||{x:THREE.MathUtils.clamp((index%4-1.5)*5,-20,20),z:THREE.MathUtils.clamp(-12-Math.floor(index/4)*4,-22,22)};
  group.position.set(spawn.x,0,spawn.z);
- scene.add(group);const bot={group,hp,hpbg,health:100,maxHealth:100,fire:rand(.55,1.15),speed:rand(1.35,1.8),alerted:false,strafe:index%2?1:-1,alive:true,hitFlash:0,mixer:null};bots.push(bot);
+ scene.add(group);const bot={group,hp,hpbg,ally:index>=60,health:100,maxHealth:100,fire:rand(.55,1.15),speed:rand(1.35,1.8),alerted:false,strafe:index%2?1:-1,alive:true,hitFlash:0,mixer:null};bots.push(bot);
  if(soldierTemplate)attachSoldier(bot);return bot;
 }
 

@@ -233,7 +233,7 @@ function buildMap(round){
  for(let rung=.28;rung<roofTop-.05;rung+=.38){const rungMesh=new THREE.Mesh(new THREE.CylinderGeometry(.045,.045,.96,10),ladderMat);rungMesh.rotation.z=Math.PI/2;rungMesh.position.set(ladderX,rung,ladderZ);rungMesh.castShadow=true;world.add(rungMesh);}
  const ladderSign=new THREE.Mesh(new THREE.BoxGeometry(1.35,.42,.08),mat(0x172326));ladderSign.position.set(ladderX,1.25,ladderZ-.56);world.add(ladderSign);
 }
-buildMap(1);
+// O mapa inicial é criado por spawnWave() no fim do módulo, depois que todas as dependências foram inicializadas.
 const skyHaze = new THREE.Mesh(new THREE.PlaneGeometry(100,18),new THREE.MeshBasicMaterial({color:0xc1c5b3,transparent:true,opacity:.18,side:THREE.DoubleSide}));skyHaze.position.set(0,11,-38);world.add(skyHaze);
 // Distant patrol aircraft: a small, low-cost silhouette that crosses the skyline.
 // Combat helicopter with recognizable cockpit, tail boom, tail rotor, landing skids and spinning main rotor.

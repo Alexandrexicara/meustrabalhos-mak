@@ -725,6 +725,35 @@ function moveBlocked(x,z){
   return verticalOverlap&&Math.abs(x-c.x)<c.hx+.42&&Math.abs(z-c.z)<c.hz+.42;
  });
 }
+function movePlayerHorizontal(dx,dz){
+ // Small swept steps prevent tunnelling and let the player slide along either
+ // side of a wall/corner instead of becoming locked against the collider.
+ const distance=Math.hypot(dx,dz),steps=Math.max(1,Math.ceil(distance/.14));
+ const sx=dx/steps,sz=dz/steps;
+ for(let i=0;i<steps;i++){
+  const nx=THREE.MathUtils.clamp(camera.position.x+sx,-mapBounds,mapBounds);
+  const nz=THREE.MathUtils.clamp(camera.position.z+sz,-mapBounds,mapBounds);
+  if(onRooftop){
+   if(nx<roofBounds.minX||nx>roofBounds.maxX||nz<roofBounds.minZ||nz>roofBounds.maxZ){
+    camera.position.x=nx;camera.position.z=nz;onRooftop=false;player.onGround=false;player.velocity.y=-.7;toast('SAINDO DA LAJE // QUEDA');return;
+   }
+  }
+  const canX=Math.abs(nx-camera.position.x)>.00001&&!moveBlocked(nx,camera.position.z);
+  if(canX)camera.position.x=nx;
+  const canZ=Math.abs(nz-camera.position.z)>.00001&&!moveBlocked(camera.position.x,nz);
+  if(canZ)camera.position.z=nz;
+  // If spawned/intersecting a collider, gently move to the nearest free point.
+  if(!canX&&!canZ&&moveBlocked(camera.position.x,camera.position.z)){
+   let recovered=false;
+   for(let radius=.12;radius<=1.2&&!recovered;radius+=.12){
+    for(let a=0;a<Math.PI*2;a+=Math.PI/8){
+     const tx=camera.position.x+Math.cos(a)*radius,tz=camera.position.z+Math.sin(a)*radius;
+     if(!moveBlocked(tx,tz)){camera.position.x=tx;camera.position.z=tz;recovered=true;break;}
+    }
+   }
+  }
+ }
+}
 function damagePlayer(amount){if(!player.alive)return;playSound('damage');player.health=Math.max(0,player.health-amount);$('damage-flash').classList.add('show');setTimeout(()=>$('damage-flash').classList.remove('show'),100);updateHUD();if(player.health<=0){player.alive=false;player.active=false;document.exitPointerLock?.();$('gameover-copy').textContent='You neutralized '+player.kills+' hostiles across '+player.round+' rounds.';gameoverScreen.classList.remove('hidden');}}
 function fireBot(bot,dt){
  bot.fire-=dt;if(bot.fire>0)return;bot.fire=rand(.72,1.18);
@@ -1000,10 +1029,16 @@ function update(dt){
   if(ladderClimb.active){updateLadderClimb(dt);}
   else{
    const forward=new THREE.Vector3(0,0,-1).applyQuaternion(camera.quaternion);forward.y=0;forward.normalize();const right=new THREE.Vector3().crossVectors(forward,new THREE.Vector3(0,1,0)).normalize();
-   const move=new THREE.Vector3();if(keys.KeyW)move.add(forward);if(keys.KeyS)move.sub(forward);if(keys.KeyD)move.add(right);if(keys.KeyA)move.sub(right);
-   if(move.lengthSq()>0){if(elapsed-lastStepSound>.38){playSound('step');lastStepSound=elapsed;}move.normalize();const speed=(keys.ShiftLeft||keys.ShiftRight)?8.5:5.2;const nx=camera.position.x+move.x*speed*dt,nz=camera.position.z+move.z*speed*dt;
-    if(onRooftop){const leavesRoof=nx<roofBounds.minX||nx>roofBounds.maxX||nz<roofBounds.minZ||nz>roofBounds.maxZ;if(leavesRoof){camera.position.x=nx;camera.position.z=nz;onRooftop=false;player.onGround=false;player.velocity.y=-.7;toast('SAINDO DA LAJE // QUEDA');}else{if(!moveBlocked(nx,camera.position.z))camera.position.x=nx;if(!moveBlocked(camera.position.x,nz))camera.position.z=nz;}}
-    else{if(!moveBlocked(nx,camera.position.z))camera.position.x=nx;if(!moveBlocked(camera.position.x,nz))camera.position.z=nz;if(Math.abs(camera.position.x-nx)+Math.abs(camera.position.z-nz)<.0001){for(const [ex,ez] of [[1,0],[-1,0],[0,1],[0,-1],[.7,.7],[-.7,.7],[.7,-.7],[-.7,-.7]]){const tx=camera.position.x+ex*.65,tz=camera.position.z+ez*.65;if(!moveBlocked(tx,tz)){camera.position.x=tx;camera.position.z=tz;break;}}}}bob+=dt*speed;}
+   const move=new THREE.Vector3();
+   if(keys.KeyW||keys.ArrowUp)move.add(forward);
+   if(keys.KeyS||keys.ArrowDown)move.sub(forward);
+   if(keys.KeyD||keys.ArrowRight)move.add(right);
+   if(keys.KeyA||keys.ArrowLeft)move.sub(right);
+   if(move.lengthSq()>0){
+    if(elapsed-lastStepSound>.38){playSound('step');lastStepSound=elapsed;}
+    move.normalize();const speed=(keys.ShiftLeft||keys.ShiftRight)?8.5:5.2;
+    movePlayerHorizontal(move.x*speed*dt,move.z*speed*dt);bob+=dt*speed;
+   }
    const nearLadderGround=Math.hypot(camera.position.x-ladderPosition.x,camera.position.z-(ladderPosition.z-1.05))<2.8;
    const nearLadderRoof=onRooftop&&Math.hypot(camera.position.x-5.85,camera.position.z-ladderPosition.z)<2.1;
    if(player.onGround&&!onRooftop&&nearLadderGround)beginLadderClimb('up');

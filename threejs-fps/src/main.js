@@ -467,7 +467,7 @@ soldierLoader.load('https://threejs.org/examples/models/gltf/Soldier.glb',gltf=>
  soldierTemplate=gltf.scene;soldierClips=gltf.animations||[];
  for(const bot of bots)attachSoldier(bot);
  for(const ally of allies)attachSoldier(ally);
- for(const vehicle of combatVehicles)if(vehicle.crew)attachSoldier(vehicle.crew);
+ for(const vehicle of combatVehicles)for(const crewman of vehicle.crew)attachSoldier(crewman);
 },undefined,error=>console.warn('Soldier model unavailable; using local fallback:',error));
 function attachSoldier(bot){
  if(!soldierTemplate||!bot.alive)return;

@@ -464,13 +464,18 @@ function startAmbientAudio(){
  const drone=audioCtx.createOscillator(),droneGain=audioCtx.createGain(),droneFilter=audioCtx.createBiquadFilter();drone.type='sawtooth';drone.frequency.value=48;droneFilter.type='lowpass';droneFilter.frequency.value=105;droneGain.gain.value=.012;drone.connect(droneFilter);droneFilter.connect(droneGain);droneGain.connect(masterGain);drone.start();
 }
 let soldierTemplate=null,soldierClips=[];
+let resolveSoldierModelReady;
+const soldierModelReady=new Promise(resolve=>{resolveSoldierModelReady=resolve;});
+// O jogo possui modelos locais de reserva; não espera indefinidamente por rede externa.
+const soldierModelFallbackTimer=setTimeout(()=>resolveSoldierModelReady(),4500);
 const soldierLoader=new GLTFLoader();
 soldierLoader.load('https://threejs.org/examples/models/gltf/Soldier.glb',gltf=>{
  soldierTemplate=gltf.scene;soldierClips=gltf.animations||[];
  for(const bot of bots)attachSoldier(bot);
  for(const ally of allies)attachSoldier(ally);
  for(const vehicle of combatVehicles)for(const crewman of vehicle.crew)attachSoldier(crewman);
-},undefined,error=>console.warn('Soldier model unavailable; using local fallback:',error));
+ clearTimeout(soldierModelFallbackTimer);resolveSoldierModelReady();
+},undefined,error=>{console.warn('Soldier model unavailable; using local fallback:',error);clearTimeout(soldierModelFallbackTimer);resolveSoldierModelReady();});
 function attachSoldier(bot){
  if(!soldierTemplate||!bot.alive)return;
  const old=bot.group.getObjectByName('fallback-body');
@@ -953,7 +958,8 @@ function updateProjectiles(dt){
 }
 function reload(){if(!player.active||player.reloading)return;if(player.weaponType==='pistol'){if(player.pistolAmmo===12||player.pistolReserve<=0)return;player.reloading=true;playSound('reload');toast('SIDEARM RELOAD');setTimeout(()=>{const n=Math.min(12-player.pistolAmmo,player.pistolReserve);player.pistolAmmo+=n;player.pistolReserve-=n;player.reloading=false;updateHUD();},900);return;}if(player.weaponType==='launcher'){toast('AT-4 // DISPOSITIVO DE DISPARO ÚNICO');return;}if(player.ammo===30||player.reserve<=0){if(player.reserve<=0)setWeapon('pistol');return;}player.reloading=true;playSound('reload');toast('RELOADING');setTimeout(()=>{const n=Math.min(30-player.ammo,player.reserve);player.ammo+=n;player.reserve-=n;player.reloading=false;updateHUD();},1250);}
 function togglePause(){if(!player.active||!player.alive)return;if(pointerLocked){document.exitPointerLock();}else{canvas.requestPointerLock?.();}}
-async function begin(){try{const root=document.documentElement;if(!document.fullscreenElement&&!document.webkitFullscreenElement){const request=root.requestFullscreen||root.webkitRequestFullscreen||root.webkitRequestFullScreen;if(request){const result=request.call(root);if(result&&typeof result.catch==='function')result.catch(()=>{});}}if(window.__tacticalGameReady)await window.__tacticalGameReady;if(window.__tacticalAccessReady)await window.__tacticalAccessReady;}catch(error){console.warn('Access or scene readiness check failed:',error);}if(!window.__tacticalLicenseActive){window.openTacticalLicense?.();document.getElementById('license-gate')?.classList.remove('hidden');return;}initAudio();startScreen.classList.add('hidden');player.active=true;roundTime=120;updateHUD();if(!isTouchDevice)canvas.requestPointerLock?.();toast('OPERATION LIVE // GOOD HUNT');}
+let gameStarting=false;
+async function begin(){if(gameStarting||player.active)return;gameStarting=true;const launchButton=$('deploy-btn');if(launchButton){launchButton.disabled=true;launchButton.textContent='CARREGANDO CENÁRIO...';}try{const root=document.documentElement;if(!document.fullscreenElement&&!document.webkitFullscreenElement){const request=root.requestFullscreen||root.webkitRequestFullscreen||root.webkitRequestFullScreen;if(request){const result=request.call(root);if(result&&typeof result.catch==='function')result.catch(()=>{});}}await Promise.all([window.__tacticalGameReady||Promise.resolve(),window.__tacticalAccessReady||Promise.resolve(),soldierModelReady]);}catch(error){console.warn('Access or scene readiness check failed:',error);}if(!window.__tacticalLicenseActive){gameStarting=false;if(launchButton){launchButton.disabled=false;launchButton.textContent='INICIAR OPERAÇÃO';}window.openTacticalLicense?.();document.getElementById('license-gate')?.classList.remove('hidden');return;}initAudio();startScreen.classList.add('hidden');player.active=true;roundTime=120;updateHUD();gameStarting=false;if(launchButton){launchButton.disabled=false;launchButton.textContent='INICIAR OPERAÇÃO';}if(!isTouchDevice)canvas.requestPointerLock?.();toast('OPERATION LIVE // GOOD HUNT');}
 $('deploy-btn').addEventListener('click',begin);
 if(new URLSearchParams(window.location.search).get('admin')==='1'){
   // A sessão do admin já foi validada pelo painel. Inicie a partida assim que
@@ -998,14 +1004,12 @@ if(isTouchDevice){
  stick?.addEventListener('pointerup',resetStick);stick?.addEventListener('pointercancel',resetStick);stick?.addEventListener('lostpointercapture',resetStick);
  look?.addEventListener('pointerdown',e=>{if(e.target.closest('button')||e.target.closest('#move-stick'))return;e.preventDefault();lookPointer=e.pointerId;look.setPointerCapture(e.pointerId);lookPoint={x:e.clientX,y:e.clientY};lookStart={x:e.clientX,y:e.clientY};lookMoved=false;});
  look?.addEventListener('pointermove',e=>{if(e.pointerId!==lookPointer||!player.active)return;e.preventDefault();const dx=e.clientX-lookPoint.x,dy=e.clientY-lookPoint.y;if(Math.hypot(e.clientX-lookStart.x,e.clientY-lookStart.y)>10)lookMoved=true;lookPoint={x:e.clientX,y:e.clientY};camera.rotation.order='YXZ';camera.rotation.y-=dx*.002;camera.rotation.x=THREE.MathUtils.clamp(camera.rotation.x-dy*.002,-1.35,1.35);});
+ const projectedArmPoints=()=>{camera.updateMatrixWorld(true);return [leftHand,leftElbow,leftForearmGuard].map(part=>{const p=new THREE.Vector3();part.getWorldPosition(p);p.project(camera);return {x:(p.x*.5+.5)*innerWidth,y:(-.5*p.y+.5)*innerHeight};});};
  const stopLook=e=>{if(e.pointerId!==lookPointer)return;
   if(!lookMoved&&player.active&&player.alive){
-   const x=e.clientX,y=e.clientY,region=y>innerHeight*.58?(x>innerWidth*.52?'weapon':'hand'):'';
-   if(region){
-    const now=performance.now(),same=mobileLastTap.region===region&&now-mobileLastTap.time<380&&Math.hypot(x-mobileLastTap.x,y-mobileLastTap.y)<42;
-    if(same){if(region==='weapon')shoot();else throwGrenade();mobileLastTap={region:'',time:0,x:0,y:0};}
-    else mobileLastTap={region,time:now,x,y};
-   }
+   const x=e.clientX,y=e.clientY,armHit=y>innerHeight*.42&&projectedArmPoints().some(p=>Math.hypot(x-p.x,y-p.y)<Math.max(58,Math.min(96,innerWidth*.22)));
+   const region=armHit?'hand':(y>innerHeight*.58&&x>innerWidth*.64?'weapon':'');
+   if(region){const now=performance.now(),same=mobileLastTap.region===region&&now-mobileLastTap.time<650&&Math.hypot(x-mobileLastTap.x,y-mobileLastTap.y)<Math.max(55,innerWidth*.14);if(same){if(region==='weapon')shoot();else throwGrenade();mobileLastTap={region:'',time:0,x:0,y:0};}else mobileLastTap={region,time:now,x,y};}else mobileLastTap={region:'',time:0,x:0,y:0};
   }
   lookPointer=null;
  };look?.addEventListener('pointerup',stopLook);look?.addEventListener('pointercancel',e=>{if(e.pointerId===lookPointer)lookPointer=null;});

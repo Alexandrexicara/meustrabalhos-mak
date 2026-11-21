@@ -15,7 +15,7 @@ camera.position.set(0, 1.72, 8);
 let renderer = null;
 const lowPowerDevice = window.matchMedia('(pointer: coarse)').matches || (navigator.hardwareConcurrency || 4) <= 4;
 try {
- renderer = new THREE.WebGLRenderer({ canvas, antialias: false, alpha: false, powerPreference: 'low-power', preserveDrawingBuffer: window.matchMedia('(pointer: coarse)').matches || navigator.maxTouchPoints > 0, failIfMajorPerformanceCaveat: false });
+ renderer = new THREE.WebGLRenderer({ canvas, antialias: false, alpha: false, powerPreference: 'low-power', preserveDrawingBuffer: false, failIfMajorPerformanceCaveat: false });
 } catch (error) {
  console.error('WebGL2 initialization failed:', error);
  canvas.style.display = 'none';
@@ -26,7 +26,7 @@ try {
  document.body.appendChild(fallback);
 }
 if (renderer) {
- renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, lowPowerDevice ? 0.9 : 1.15));
+ renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, lowPowerDevice ? 0.72 : 1.0));
  renderer.setSize(innerWidth, innerHeight, false);
  renderer.domElement.style.width = '100%';
  renderer.domElement.style.height = '100%';
@@ -417,18 +417,18 @@ const isTouchDevice=window.matchMedia('(pointer: coarse)').matches||navigator.ma
 
 // Real mobile sniper optic: fixed circular lens, live zoom from the exact screen-center aim.
 const isMobileLens = isTouchDevice || window.innerWidth <= 760;
-let aimMagnifier=null,aimMagnifierContext=null;
+let aimMagnifier=null,aimMagnifierContext=null,aimMagnifierFrame=null,aimMagnifierLastDraw=0;
 if(isMobileLens){
  aimMagnifier=document.createElement('canvas');
  aimMagnifier.id='aim-magnifier';
- aimMagnifier.width=320; aimMagnifier.height=320;
+ aimMagnifier.width=240; aimMagnifier.height=240;
  aimMagnifier.setAttribute('aria-label','Lente de mira sniper com zoom ao vivo');
  aimMagnifier.style.cssText='position:fixed!important;z-index:100000!important;left:39%!important;top:56%!important;right:auto!important;bottom:auto!important;transform:translate(-50%,-50%)!important;width:clamp(118px,31vw,154px)!important;height:clamp(118px,31vw,154px)!important;display:block!important;visibility:visible!important;opacity:1!important;pointer-events:none!important;border:7px solid #171d1d!important;border-radius:50%!important;clip-path:circle(50%)!important;box-shadow:0 0 0 2px #87918b,0 0 0 5px #080d0e,0 5px 22px #000e,0 0 20px #b8e56b55!important;background:#071012!important;';
  aimMagnifierContext=aimMagnifier.getContext('2d',{alpha:false});
- document.body.appendChild(aimMagnifier);
+ document.body.appendChild(aimMagnifier);aimMagnifierFrame=document.createElement('img');aimMagnifierFrame.id='aim-magnifier-frame';aimMagnifierFrame.src='/assets/sniper-optic-frame.svg';aimMagnifierFrame.alt='';aimMagnifierFrame.setAttribute('aria-hidden','true');document.body.appendChild(aimMagnifierFrame);
 }
 function drawAimMagnifier(){
- if(!aimMagnifier||!aimMagnifierContext||!renderer)return;
+ if(!aimMagnifier||!aimMagnifierContext||!renderer)return;const now=performance.now();if(now-aimMagnifierLastDraw<70)return;aimMagnifierLastDraw=now;
  if(!player.active||!player.alive){
   aimMagnifier.style.visibility='hidden';
   return;
@@ -439,24 +439,24 @@ function drawAimMagnifier(){
  const sx=(source.width-side)*.5, sy=(source.height-side)*.5;
  try{
   aimMagnifierContext.save();
-  aimMagnifierContext.clearRect(0,0,320,320);
+  aimMagnifierContext.clearRect(0,0,240,240);
   aimMagnifierContext.beginPath();
-  aimMagnifierContext.arc(160,160,155,0,Math.PI*2);
+  aimMagnifierContext.arc(120,120,116,0,Math.PI*2);
   aimMagnifierContext.clip();
   aimMagnifierContext.imageSmoothingEnabled=true;
   aimMagnifierContext.imageSmoothingQuality='high';
-  aimMagnifierContext.drawImage(source,sx,sy,side,side,0,0,320,320);
+  aimMagnifierContext.drawImage(source,sx,sy,side,side,0,0,240,240);
   aimMagnifierContext.restore();
   // Sniper optic reticle and glass reflections, all clipped to the round lens.
   aimMagnifierContext.save();
-  aimMagnifierContext.beginPath();aimMagnifierContext.arc(160,160,151,0,Math.PI*2);aimMagnifierContext.clip();
-  const shine=aimMagnifierContext.createLinearGradient(20,20,300,300);
+  aimMagnifierContext.beginPath();aimMagnifierContext.arc(120,120,113,0,Math.PI*2);aimMagnifierContext.clip();
+  const shine=aimMagnifierContext.createLinearGradient(15,15,225,225);
   shine.addColorStop(0,'rgba(220,255,225,.22)');shine.addColorStop(.34,'rgba(220,255,225,0)');
   shine.addColorStop(.72,'rgba(0,0,0,0)');shine.addColorStop(1,'rgba(190,230,210,.12)');
-  aimMagnifierContext.fillStyle=shine;aimMagnifierContext.fillRect(0,0,320,320);
+  aimMagnifierContext.fillStyle=shine;aimMagnifierContext.fillRect(0,0,240,240);
   aimMagnifierContext.strokeStyle='rgba(190,245,170,.92)';aimMagnifierContext.lineWidth=1.5;
-  aimMagnifierContext.beginPath();aimMagnifierContext.moveTo(137,160);aimMagnifierContext.lineTo(183,160);aimMagnifierContext.moveTo(160,137);aimMagnifierContext.lineTo(160,183);aimMagnifierContext.stroke();
-  aimMagnifierContext.fillStyle='#d7ff9b';aimMagnifierContext.beginPath();aimMagnifierContext.arc(160,160,3,0,Math.PI*2);aimMagnifierContext.fill();
+  aimMagnifierContext.beginPath();aimMagnifierContext.moveTo(103,120);aimMagnifierContext.lineTo(137,120);aimMagnifierContext.moveTo(120,103);aimMagnifierContext.lineTo(120,137);aimMagnifierContext.stroke();
+  aimMagnifierContext.fillStyle='#d7ff9b';aimMagnifierContext.beginPath();aimMagnifierContext.arc(120,120,2.5,0,Math.PI*2);aimMagnifierContext.fill();
   aimMagnifierContext.restore();
  }catch(error){console.warn('Sniper optic frame failed:',error);}
 }
@@ -698,7 +698,7 @@ function updateAllies(dt){
 
 function spawnWave(){
  onRooftop=false;ladderClimb.active=false;for(const heli of helicopters){heli.destroyed=false;heli.group.visible=true;}for(const part of helicopterDebris){scene.remove(part.mesh);part.mesh.geometry.dispose();if(Array.isArray(part.mesh.material))part.mesh.material.forEach(m=>m.dispose());else part.mesh.material.dispose();}helicopterDebris.length=0;routeActive=false;if(routeMarker){world.remove(routeMarker);routeMarker=null;}buildMap(player.round);spawnSupplyPickups();for(const b of bots)scene.remove(b.group);bots.length=0;for(const a of allies)scene.remove(a.group);allies.length=0;
- const count=Math.min(18+(player.round-1)*4,40);for(let i=0;i<count;i++){const bot=makeBot(i);if(i<4){const roofSpots=[[-4.2,-19.2],[4.2,-19.2],[-2.7,-13.8],[2.7,-13.8]];bot.group.position.set(roofSpots[i][0],roofTopHeight,roofSpots[i][1]);}}spawnAllies();
+ const count=Math.min(12+(player.round-1)*2,24);for(let i=0;i<count;i++){const bot=makeBot(i);if(i<4){const roofSpots=[[-4.2,-19.2],[4.2,-19.2],[-2.7,-13.8],[2.7,-13.8]];bot.group.position.set(roofSpots[i][0],roofTopHeight,roofSpots[i][1]);}}spawnAllies();
  $('wave').textContent=String(count).padStart(2,'0');$('radar-count').textContent=String(count).padStart(2,'0');
  $('round-label').textContent='ROUND '+String(player.round).padStart(2,'0');
  const missions=[
@@ -830,7 +830,7 @@ function fireBot(bot,dt){
  const rifle=bot?.heldRifle;
  if(!bot?.alive||!bot.group.visible||!body?.visible||!rifle?.visible||!rifle.parent)return;
  bot.group.updateWorldMatrix(true,true);rifle.updateWorldMatrix(true,false);
- bot.fire-=dt;if(bot.fire>0)return;bot.fire=rand(1.15,1.65);
+ bot.fire-=dt;if(bot.fire>0)return;bot.fire=rand(2.7,3.6);
  const origin=rifle.localToWorld(new THREE.Vector3(0,0,.68));
  const target=camera.position.clone().add(new THREE.Vector3(rand(-.9,.9),rand(-.55,.55),rand(-.9,.9)));
  const delta=target.clone().sub(origin),distance=delta.length(),direction=delta.normalize();
@@ -841,7 +841,7 @@ function fireBot(bot,dt){
  const flash=new THREE.Mesh(new THREE.SphereGeometry(.065,8,6),new THREE.MeshBasicMaterial({color:0xffc16a,transparent:true,opacity:.98,blending:THREE.AdditiveBlending,depthWrite:false}));flash.position.set(0,0,.68);rifle.add(flash);setTimeout(()=>{rifle.remove(flash);flash.geometry.dispose();flash.material.dispose();},65);
  const tracer=new THREE.Mesh(new THREE.CylinderGeometry(.014,.014,.58,6),new THREE.MeshBasicMaterial({color:0xffb36b,emissive:0x8b3a12}));
  tracer.position.copy(origin);tracer.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0),direction);scene.add(tracer);
- enemyBullets.push({mesh:tracer,velocity:direction.clone().multiplyScalar(36),life:Math.min(1.15,distance/36+.08),damage:rand(2,3)});
+ enemyBullets.push({mesh:tracer,velocity:direction.clone().multiplyScalar(36),life:Math.min(1.15,distance/36+.08),damage:rand(1.4,2.1)});
  playSound('enemy');
 }
 function spawnBlood(position){
@@ -1108,7 +1108,7 @@ function updateBots(dt){
   // Soldier.glb faces local -Z: rotate the whole hostile so its chest and rifle face the player.
   b.group.rotation.y=Math.atan2(-dx,-dz);
   // Hostiles stay in a ready stance but only open fire at close range.
-  const toPlayer=new THREE.Vector3(dx,0,dz).normalize();const facing=new THREE.Vector3(0,0,-1).applyAxisAngle(new THREE.Vector3(0,1,0),b.group.rotation.y);const inVision=dist<=38&&facing.dot(toPlayer)>.12;let clearShot=false;if(inVision){const eye=p.clone().add(new THREE.Vector3(0,1.38,0)),aim=camera.position.clone();const sight=aim.clone().sub(eye),sightDistance=sight.length();raycaster.set(eye,sight.normalize());raycaster.far=sightDistance;const sightBlock=raycaster.intersectObjects(world.children,true).find(hit=>hit.object.isMesh&&hit.object.visible);clearShot=!sightBlock||sightBlock.distance>sightDistance-.35;}if(clearShot&&!b.alerted){b.alerted=true;b.fire=rand(.2,.55);b.burst=rand(3,5);b.strafeTimer=rand(1.5,3.2);}
+  const toPlayer=new THREE.Vector3(dx,0,dz).normalize();const facing=new THREE.Vector3(0,0,-1).applyAxisAngle(new THREE.Vector3(0,1,0),b.group.rotation.y);const inVision=dist<=38&&facing.dot(toPlayer)>.12;b.visionTimer=(b.visionTimer||0)-dt;if(b.visionTimer<=0){b.visionTimer=.22;b.clearShot=false;if(inVision){const eye=p.clone().add(new THREE.Vector3(0,1.38,0)),aim=camera.position.clone();const sight=aim.clone().sub(eye),sightDistance=sight.length();raycaster.set(eye,sight.normalize());raycaster.far=sightDistance;const sightBlock=raycaster.intersectObjects(world.children,true).find(hit=>hit.object.isMesh&&hit.object.visible);b.clearShot=!sightBlock||sightBlock.distance>sightDistance-.35;}}const clearShot=!!b.clearShot;if(clearShot&&!b.alerted){b.alerted=true;b.fire=rand(.2,.55);b.burst=rand(3,5);b.strafeTimer=rand(1.5,3.2);}
   if(!b.alerted){setBotAnimation(b,'idle');continue;}
   // Soldiers fight from separated positions. Only a small assault element advances,
   // and it stops at a safe firing distance instead of charging the player as a mob.
@@ -1146,8 +1146,8 @@ function updateRadar(){
  }
 }
 function update(dt){
- elapsed+=dt;for(let hi=0;hi<helicopters.length;hi++){const heli=helicopters[hi];if(heli.destroyed)continue;heli.phase+=dt*.48;const g=heli.group;g.position.x=((elapsed*(2+hi*.18)+48-hi*17)%110)-55;g.position.y=15+Math.sin(elapsed*.55+heli.phase)*.65;g.position.z=-27+Math.sin(elapsed*.24+heli.phase)*7-hi*10;g.rotation.y=Math.PI+Math.sin(elapsed*.24+heli.phase)*.12;heli.mainRotor.rotation.y+=dt*34;heli.tailRotor.rotation.x+=dt*29;if(player.active&&player.alive){heli.attack-=dt;if(heli.attack<=0){heli.attack=rand(3.4,5.2);const origin=g.position.clone().add(new THREE.Vector3(1,-.4,0)),target=camera.position.clone().add(new THREE.Vector3(rand(-1.5,1.5),0,rand(-1.5,1.5))),dir=target.sub(origin).normalize();const bolt=new THREE.Mesh(new THREE.CylinderGeometry(.045,.045,.85,6),new THREE.MeshBasicMaterial({color:0xffb45e,emissive:0xff5522}));bolt.position.copy(origin);bolt.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0),dir);scene.add(bolt);heliBullets.push({mesh:bolt,heli,velocity:dir.multiplyScalar(27),life:2.2});}}}updateHelicopterDebris(dt);for(let i=heliBullets.length-1;i>=0;i--){const b=heliBullets[i];b.mesh.position.addScaledVector(b.velocity,dt);b.life-=dt;if(b.mesh.position.distanceTo(camera.position)<.65){damagePlayer(10);b.life=-1;}if(b.life<=0){scene.remove(b.mesh);heliBullets.splice(i,1);}}
- for(let i=heliBullets.length-1;i>=0;i--){const b=heliBullets[i];b.mesh.position.addScaledVector(b.velocity,dt);b.life-=dt;if(b.mesh.position.distanceTo(camera.position)<.65){damagePlayer(10);b.life=-1;}if(b.life<=0){scene.remove(b.mesh);heliBullets.splice(i,1);}}
+ elapsed+=dt;for(let hi=0;hi<helicopters.length;hi++){const heli=helicopters[hi];if(heli.destroyed)continue;heli.phase+=dt*.48;const g=heli.group;g.position.x=((elapsed*(2+hi*.18)+48-hi*17)%110)-55;g.position.y=15+Math.sin(elapsed*.55+heli.phase)*.65;g.position.z=-27+Math.sin(elapsed*.24+heli.phase)*7-hi*10;g.rotation.y=Math.PI+Math.sin(elapsed*.24+heli.phase)*.12;heli.mainRotor.rotation.y+=dt*34;heli.tailRotor.rotation.x+=dt*29;if(player.active&&player.alive){heli.attack-=dt;if(heli.attack<=0){heli.attack=rand(7,10);const origin=g.position.clone().add(new THREE.Vector3(1,-.4,0)),target=camera.position.clone().add(new THREE.Vector3(rand(-1.5,1.5),0,rand(-1.5,1.5))),dir=target.sub(origin).normalize();const bolt=new THREE.Mesh(new THREE.CylinderGeometry(.045,.045,.85,6),new THREE.MeshBasicMaterial({color:0xffb45e,emissive:0xff5522}));bolt.position.copy(origin);bolt.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0),dir);scene.add(bolt);heliBullets.push({mesh:bolt,heli,velocity:dir.multiplyScalar(27),life:2.2});}}}updateHelicopterDebris(dt);for(let i=heliBullets.length-1;i>=0;i--){const b=heliBullets[i];b.mesh.position.addScaledVector(b.velocity,dt);b.life-=dt;if(b.mesh.position.distanceTo(camera.position)<.65){damagePlayer(5);b.life=-1;}if(b.life<=0){scene.remove(b.mesh);heliBullets.splice(i,1);}}
+ 
  updateCombatVehicles(dt);
  updateRocketProjectiles(dt);shotCooldown=Math.max(0,shotCooldown-dt);recoil=Math.max(0,recoil-dt*.55);
  if(player.active&&player.alive){

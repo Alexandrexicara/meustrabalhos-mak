@@ -173,3 +173,18 @@
  .how-to-play-card li{font-size:10px}
  .start-content button{margin-top:18px}
 }
+
+
+/* Live circular magnifier follows the center aim point on mobile only. */
+#aim-magnifier{
+ display:none;position:fixed;z-index:9;left:50%;bottom:clamp(118px,19vh,168px);
+ width:110px;height:110px;transform:translateX(-50%);
+ border:3px solid rgba(197,243,107,.92);border-radius:50%;
+ background:#071012;box-shadow:0 0 0 2px rgba(5,12,14,.82),0 5px 22px rgba(0,0,0,.72),0 0 18px rgba(197,243,107,.18);
+ pointer-events:none;object-fit:cover;image-rendering:auto;
+}
+#aim-magnifier.is-visible{display:block}
+@media (pointer:fine){#aim-magnifier{display:none!important}}
+@media(max-width:420px){
+ #aim-magnifier{width:98px;height:98px;bottom:clamp(108px,17vh,145px);border-width:2px}
+}

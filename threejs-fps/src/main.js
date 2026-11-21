@@ -415,40 +415,50 @@ let missionMarker=null,routeMarker=null,routeActive=false,missionKind='eliminate
 const keys={}; let pointerLocked=false, elapsed=0, roundTime=120, recoil=0, bob=0, shotCooldown=0, toastTimeout;
 const isTouchDevice=window.matchMedia('(pointer: coarse)').matches||navigator.maxTouchPoints>0;
 
-// Mobile aim magnifier: a circular live crop centered on the exact camera reticle.
+// Real mobile sniper optic: fixed circular lens, live zoom from the exact screen-center aim.
+const isMobileLens = isTouchDevice || window.innerWidth <= 760;
 let aimMagnifier=null,aimMagnifierContext=null;
-if(isTouchDevice){
+if(isMobileLens){
  aimMagnifier=document.createElement('canvas');
  aimMagnifier.id='aim-magnifier';
- aimMagnifier.width=240;aimMagnifier.height=240;
- aimMagnifier.setAttribute('aria-label','Lupa circular da mira: zoom ao vivo do ponto central');
- aimMagnifier.style.cssText='position:fixed!important;z-index:99999!important;left:50%!important;top:57%!important;bottom:auto!important;transform:translate(-50%,-50%)!important;width:116px!important;height:116px!important;display:none;pointer-events:none!important;border:3px solid #c5f36b!important;border-radius:50%!important;overflow:hidden!important;box-shadow:0 0 0 3px #071012,0 5px 24px #000c,0 0 18px #c5f36b55!important;background:#071012!important;';
+ aimMagnifier.width=320; aimMagnifier.height=320;
+ aimMagnifier.setAttribute('aria-label','Lente de mira sniper com zoom ao vivo');
+ aimMagnifier.style.cssText='position:fixed!important;z-index:100000!important;left:39%!important;top:56%!important;right:auto!important;bottom:auto!important;transform:translate(-50%,-50%)!important;width:clamp(118px,31vw,154px)!important;height:clamp(118px,31vw,154px)!important;display:block!important;visibility:visible!important;opacity:1!important;pointer-events:none!important;border:7px solid #171d1d!important;border-radius:50%!important;clip-path:circle(50%)!important;box-shadow:0 0 0 2px #87918b,0 0 0 5px #080d0e,0 5px 22px #000e,0 0 20px #b8e56b55!important;background:#071012!important;';
  aimMagnifierContext=aimMagnifier.getContext('2d',{alpha:false});
  document.body.appendChild(aimMagnifier);
 }
 function drawAimMagnifier(){
- if(!aimMagnifier||!aimMagnifierContext||!renderer||!player.active||!player.alive){
-  if(aimMagnifier){aimMagnifier.classList.remove('is-visible');aimMagnifier.style.display='none';}
+ if(!aimMagnifier||!aimMagnifierContext||!renderer)return;
+ if(!player.active||!player.alive){
+  aimMagnifier.style.visibility='hidden';
   return;
  }
+ aimMagnifier.style.visibility='visible';
  const source=renderer.domElement;
- const side=Math.max(48,Math.min(source.width,source.height)*.34);
- const sx=(source.width-side)*.5,sy=(source.height-side)*.5;
+ const side=Math.max(64,Math.min(source.width,source.height)*.23);
+ const sx=(source.width-side)*.5, sy=(source.height-side)*.5;
  try{
-  aimMagnifierContext.clearRect(0,0,240,240);
   aimMagnifierContext.save();
-  aimMagnifierContext.beginPath();aimMagnifierContext.arc(120,120,118,0,Math.PI*2);aimMagnifierContext.clip();
+  aimMagnifierContext.clearRect(0,0,320,320);
+  aimMagnifierContext.beginPath();
+  aimMagnifierContext.arc(160,160,155,0,Math.PI*2);
+  aimMagnifierContext.clip();
   aimMagnifierContext.imageSmoothingEnabled=true;
   aimMagnifierContext.imageSmoothingQuality='high';
-  aimMagnifierContext.drawImage(source,sx,sy,side,side,0,0,240,240);
+  aimMagnifierContext.drawImage(source,sx,sy,side,side,0,0,320,320);
   aimMagnifierContext.restore();
-  // Center crosshair corresponds exactly to the live camera aim point.
-  aimMagnifierContext.strokeStyle='rgba(197,243,107,.98)';
-  aimMagnifierContext.lineWidth=2;
-  aimMagnifierContext.beginPath();aimMagnifierContext.moveTo(106,120);aimMagnifierContext.lineTo(134,120);aimMagnifierContext.moveTo(120,106);aimMagnifierContext.lineTo(120,134);aimMagnifierContext.stroke();
-  aimMagnifier.classList.add('is-visible');
-  aimMagnifier.style.display='block';
- }catch(error){aimMagnifier.style.display='none';console.warn('Aim magnifier frame skipped:',error);}
+  // Sniper optic reticle and glass reflections, all clipped to the round lens.
+  aimMagnifierContext.save();
+  aimMagnifierContext.beginPath();aimMagnifierContext.arc(160,160,151,0,Math.PI*2);aimMagnifierContext.clip();
+  const shine=aimMagnifierContext.createLinearGradient(20,20,300,300);
+  shine.addColorStop(0,'rgba(220,255,225,.22)');shine.addColorStop(.34,'rgba(220,255,225,0)');
+  shine.addColorStop(.72,'rgba(0,0,0,0)');shine.addColorStop(1,'rgba(190,230,210,.12)');
+  aimMagnifierContext.fillStyle=shine;aimMagnifierContext.fillRect(0,0,320,320);
+  aimMagnifierContext.strokeStyle='rgba(190,245,170,.92)';aimMagnifierContext.lineWidth=1.5;
+  aimMagnifierContext.beginPath();aimMagnifierContext.moveTo(137,160);aimMagnifierContext.lineTo(183,160);aimMagnifierContext.moveTo(160,137);aimMagnifierContext.lineTo(160,183);aimMagnifierContext.stroke();
+  aimMagnifierContext.fillStyle='#d7ff9b';aimMagnifierContext.beginPath();aimMagnifierContext.arc(160,160,3,0,Math.PI*2);aimMagnifierContext.fill();
+  aimMagnifierContext.restore();
+ }catch(error){console.warn('Sniper optic frame failed:',error);}
 }
 let mobileLastTap={region:'',time:0,x:0,y:0};
 const $=id=>document.getElementById(id);

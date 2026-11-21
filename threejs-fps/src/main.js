@@ -15,7 +15,7 @@ camera.position.set(0, 1.72, 8);
 let renderer = null;
 const lowPowerDevice = window.matchMedia('(pointer: coarse)').matches || (navigator.hardwareConcurrency || 4) <= 4;
 try {
- renderer = new THREE.WebGLRenderer({ canvas, antialias: false, alpha: false, powerPreference: 'low-power', failIfMajorPerformanceCaveat: false });
+ renderer = new THREE.WebGLRenderer({ canvas, antialias: false, alpha: false, powerPreference: 'low-power', preserveDrawingBuffer: window.matchMedia('(pointer: coarse)').matches || navigator.maxTouchPoints > 0, failIfMajorPerformanceCaveat: false });
 } catch (error) {
  console.error('WebGL2 initialization failed:', error);
  canvas.style.display = 'none';
@@ -414,6 +414,40 @@ const bots=[]; const allies=[]; const bullets=[]; const enemyBullets=[]; const g
 let missionMarker=null,routeMarker=null,routeActive=false,missionKind='eliminate',missionProgress=0,missionDuration=0,missionX=0,missionZ=-8,missionDone=false; const raycaster=new THREE.Raycaster();
 const keys={}; let pointerLocked=false, elapsed=0, roundTime=120, recoil=0, bob=0, shotCooldown=0, toastTimeout;
 const isTouchDevice=window.matchMedia('(pointer: coarse)').matches||navigator.maxTouchPoints>0;
+
+// Mobile aim magnifier: a circular live crop centered on the exact camera reticle.
+let aimMagnifier=null,aimMagnifierContext=null;
+if(isTouchDevice){
+ aimMagnifier=document.createElement('canvas');
+ aimMagnifier.id='aim-magnifier';
+ aimMagnifier.width=220;aimMagnifier.height=220;
+ aimMagnifier.setAttribute('aria-label','Lupa da mira: ampliação em tempo real do centro da mira');
+ aimMagnifierContext=aimMagnifier.getContext('2d',{alpha:false});
+ document.body.appendChild(aimMagnifier);
+}
+function drawAimMagnifier(){
+ if(!aimMagnifier||!aimMagnifierContext||!renderer||!player.active||!player.alive){
+  if(aimMagnifier)aimMagnifier.classList.remove('is-visible');
+  return;
+ }
+ const source=renderer.domElement;
+ const side=Math.max(48,Math.min(source.width,source.height)*.34);
+ const sx=(source.width-side)*.5,sy=(source.height-side)*.5;
+ try{
+  aimMagnifierContext.clearRect(0,0,220,220);
+  aimMagnifierContext.save();
+  aimMagnifierContext.beginPath();aimMagnifierContext.arc(110,110,108,0,Math.PI*2);aimMagnifierContext.clip();
+  aimMagnifierContext.imageSmoothingEnabled=true;
+  aimMagnifierContext.imageSmoothingQuality='high';
+  aimMagnifierContext.drawImage(source,sx,sy,side,side,0,0,220,220);
+  aimMagnifierContext.restore();
+  // Fine reticle marks the exact center of the enlarged image.
+  aimMagnifierContext.strokeStyle='rgba(197,243,107,.9)';
+  aimMagnifierContext.lineWidth=1.5;
+  aimMagnifierContext.beginPath();aimMagnifierContext.moveTo(100,110);aimMagnifierContext.lineTo(120,110);aimMagnifierContext.moveTo(110,100);aimMagnifierContext.lineTo(110,120);aimMagnifierContext.stroke();
+  aimMagnifier.classList.add('is-visible');
+ }catch(error){console.warn('Aim magnifier frame skipped:',error);}
+}
 let mobileLastTap={region:'',time:0,x:0,y:0};
 const $=id=>document.getElementById(id);
 const startScreen=$('start-screen'),pauseScreen=$('pause-screen'),roundScreen=$('round-screen'),gameoverScreen=$('gameover-screen');
@@ -1137,6 +1171,6 @@ function update(dt){
  }
  $('clock').textContent=String(Math.floor(elapsed/60)).padStart(2,'0')+':'+String(Math.floor(elapsed%60)).padStart(2,'0');
 }
-function animate(){requestAnimationFrame(animate);if(contextLost)return;const dt=Math.min(clock.getDelta(),.15);update(dt);try{renderer.render(scene,camera);if(window.__tacticalMarkGameReady){window.__tacticalMarkGameReady();window.__tacticalMarkGameReady=null;}}catch(error){console.error('Render failed:',error);}}
+function animate(){requestAnimationFrame(animate);if(contextLost)return;const dt=Math.min(clock.getDelta(),.15);update(dt);try{renderer.render(scene,camera);drawAimMagnifier();if(window.__tacticalMarkGameReady){window.__tacticalMarkGameReady();window.__tacticalMarkGameReady=null;}}catch(error){console.error('Render failed:',error);}}
 spawnWave();updateHUD();animate();
 }

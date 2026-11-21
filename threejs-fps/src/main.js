@@ -36,7 +36,7 @@ renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure = 1.12;
 
-scene.add(new THREE.HemisphereLight(0xc9e2e4, 0x303a35, 2.0));
+const ambientLight=new THREE.HemisphereLight(0xc9e2e4,0x303a35,2.0);scene.add(ambientLight);
 const sun = new THREE.DirectionalLight(0xffe4bd, 2.8);
 sun.position.set(-12, 24, 10); sun.castShadow = !lowPowerDevice;
 sun.shadow.mapSize.set(1024, 1024);
@@ -158,7 +158,7 @@ function buildMap(round){
  for(const shell of tankShells)scene.remove(shell.mesh);tankShells.length=0;surfaceImpacts.length=0;
  world.clear();
  colliders.length=0;destructibleCrates.length=0;crateDebris.length=0;combatVehicles.length=0;
- scene.background=new THREE.Color(theme.sky);scene.fog=new THREE.Fog(theme.fog,34,132);
+ scene.background=new THREE.Color(theme.sky);scene.fog=new THREE.Fog(theme.fog,34,132);ambientLight.intensity=idx===2?.42:2.0;sun.intensity=idx===2?.38:2.8;sun.color.setHex(idx===2?0x7d91b8:0xffe4bd);renderer.toneMappingExposure=idx===2?.82:1.12;
  const floorCanvas=document.createElement('canvas');floorCanvas.width=floorCanvas.height=512;
  const ctx=floorCanvas.getContext('2d');ctx.fillStyle='#'+theme.ground.toString(16).padStart(6,'0');ctx.fillRect(0,0,512,512);
  for(let i=0;i<6500;i++){const v=Math.random(),r=Math.random()*2.8+.3;ctx.fillStyle=v>.5?'rgba(28,29,25,.18)':'rgba(230,211,174,.12)';ctx.beginPath();ctx.ellipse(Math.random()*512,Math.random()*512,r,r*.6,Math.random()*3.14,0,Math.PI*2);ctx.fill();}
@@ -182,7 +182,7 @@ function buildMap(round){
   for(const [x,z] of [[-22,-19],[21,-12],[-17,17],[24,20]]){const bush=new THREE.Mesh(new THREE.IcosahedronGeometry(2.2,1),canopies[1]);bush.position.set(x,1,z);bush.scale.set(1,.65,1.25);world.add(bush);}
  }else if(idx===2){
   // PHASE 3: night factory — enclosed production hall, catwalks, conveyors and machinery.
-  box(-18,5,0,1,10,66,wall);box(18,5,0,1,10,66,wall);box(0,5,-32,37,10,1,wall);
+  box(-18,5,0,1,10,66,wall);box(18,5,0,1,10,66,wall);box(-12,5,-32,13,10,1,wall);box(12,5,-32,13,10,1,wall);box(0,8.5,-32,11,3,1,wall);
   box(-10,9,-1,16,1,62,steel);box(10,9,-1,16,1,62,steel);
   for(let z=-25;z<=25;z+=10){box(-17,5,z,.8,10,.8,steel);box(17,5,z,.8,10,.8,steel);box(0,9.4,z,36,.35,.45,trim);}
   for(let z of [-21,-8,7,21]){box(-9,1.7,z,5.2,3.4,2.2,steel);box(9,1.7,z,5.2,3.4,2.2,steel);const pipe=new THREE.Mesh(new THREE.CylinderGeometry(.38,.38,14,12),accent);pipe.rotation.z=Math.PI/2;pipe.position.set(0,4.6,z+3);world.add(pipe);}

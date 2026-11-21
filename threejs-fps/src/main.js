@@ -98,7 +98,7 @@ function damageCrate(crate,amount,point,normal){
 function damageCratesInBlast(center,radius,damage){
  for(const crate of destructibleCrates){if(!crate.alive)continue;const d=Math.hypot(crate.x-center.x,crate.z-center.z);if(d<radius)damageCrate(crate,damage*(1-d/radius));}
 }
-const combatVehicles=[];const tankShells=[];const surfaceImpacts=[];
+const combatVehicles=[];const tankShells=[];const surfaceImpacts=[];const factoryPanels=[];let forestAmbushTriggered=false;
 function getDamageableUnits(){return [...bots.filter(b=>b?.alive),...combatVehicles.flatMap(v=>v.crew).filter(b=>b?.alive)];}
 function getRemainingGroundHostiles(){return getDamageableUnits().length;}
 function addTank(x,z){
@@ -157,7 +157,7 @@ function buildMap(round){
  const idx=previewPhase>=0?previewPhase:(round-1)%mapThemes.length,theme=mapThemes[idx];currentMap=idx;
  for(const shell of tankShells)scene.remove(shell.mesh);tankShells.length=0;surfaceImpacts.length=0;
  world.clear();
- colliders.length=0;destructibleCrates.length=0;crateDebris.length=0;combatVehicles.length=0;
+ colliders.length=0;destructibleCrates.length=0;crateDebris.length=0;combatVehicles.length=0;factoryPanels.length=0;
  scene.background=new THREE.Color(theme.sky);scene.fog=new THREE.Fog(theme.fog,34,132);ambientLight.intensity=idx===2?.42:2.0;sun.intensity=idx===2?.38:2.8;sun.color.setHex(idx===2?0x7d91b8:0xffe4bd);renderer.toneMappingExposure=idx===2?.82:1.12;
  const floorCanvas=document.createElement('canvas');floorCanvas.width=floorCanvas.height=512;
  const ctx=floorCanvas.getContext('2d');ctx.fillStyle='#'+theme.ground.toString(16).padStart(6,'0');ctx.fillRect(0,0,512,512);
@@ -190,6 +190,7 @@ function buildMap(round){
   for(let z of [-18,-4,10,24]){box(0,1.3,z,9,2.6,1.1,wall);box(-5,3,z,1,6,.8,accent);box(5,3,z,1,6,.8,accent);}
   for(const [x,z] of [[-12,-24],[12,-4],[-12,17],[12,27]]){const lamp=new THREE.PointLight(0xffa45c,5,17);lamp.position.set(x,7,z);world.add(lamp);const bulb=new THREE.Mesh(new THREE.SphereGeometry(.22,8,8),new THREE.MeshBasicMaterial({color:0xffc17a}));bulb.position.copy(lamp.position);world.add(bulb);}
   box(0,5.5,-4,24,.5,2.4,steel);
+  for(const [x,z] of [[-12,-24],[12,0],[0,23]]){const consoleGroup=new THREE.Group();consoleGroup.position.set(x,0,z);const base=new THREE.Mesh(new THREE.BoxGeometry(1.1,1.35,.8),steel);base.position.y=.68;consoleGroup.add(base);const screen=new THREE.Mesh(new THREE.BoxGeometry(.78,.42,.08),new THREE.MeshStandardMaterial({color:0xff633d,emissive:0x5a1608,emissiveIntensity:1.1}));screen.position.set(0,1.08,-.43);consoleGroup.add(screen);const beacon=new THREE.PointLight(0xff633d,1.8,5);beacon.position.set(0,1.6,0);consoleGroup.add(beacon);world.add(consoleGroup);factoryPanels.push({group:consoleGroup,screen,beacon,active:false});}
  }else if(idx===3){
   // PHASE 4: desert front — dunes, rock gullies and scattered scrub, with no tank or rooftop.
   for(let i=0;i<17;i++){const dune=new THREE.Mesh(new THREE.SphereGeometry(1,12,8),mat(i%2?0xb69a70:0x9d825e));dune.position.set(rand(-34,34),rand(.8,2.1),rand(-34,34));dune.scale.set(rand(5,11),rand(1.2,2.4),rand(4,9));world.add(dune);}
@@ -708,7 +709,7 @@ function updateAllies(dt){
 
 function spawnWave(){
  onRooftop=false;ladderClimb.active=false;for(const heli of helicopters){heli.destroyed=false;heli.group.visible=true;}for(const part of helicopterDebris){scene.remove(part.mesh);part.mesh.geometry.dispose();if(Array.isArray(part.mesh.material))part.mesh.material.forEach(m=>m.dispose());else part.mesh.material.dispose();}helicopterDebris.length=0;routeActive=false;if(routeMarker){world.remove(routeMarker);routeMarker=null;}buildMap(player.round);const phaseStart={0:[0,1.72,8],1:[0,1.72,29],2:[0,1.72,27],3:[0,1.72,29]};const start=phaseStart[currentMap]||phaseStart[0];camera.position.set(start[0],start[1],start[2]);camera.rotation.set(0,0,0);player.velocity.set(0,0,0);player.onGround=true;onRooftop=false;spawnSupplyPickups();for(const b of bots)scene.remove(b.group);bots.length=0;for(const a of allies)scene.remove(a.group);allies.length=0;
- const count=Math.min(12+(player.round-1)*2,24);const phaseSpots={1:[[-4.2,-19.2],[4.2,-19.2],[-2.7,-13.8],[2.7,-13.8]],2:[[-22,-18],[22,-17],[-16,4],[18,7]],3:[[-13,-23],[13,-21],[-13,18],[13,20]],4:[[-25,-12],[24,-10],[-18,20],[20,22]]};const fixed=phaseSpots[currentMap+1]||[];for(let i=0;i<count;i++){const bot=makeBot(i);if(i<fixed.length)bot.group.position.set(fixed[i][0],0,fixed[i][1]);}spawnAllies();
+ forestAmbushTriggered=false;const count=Math.min(12+(player.round-1)*2,24);const phaseSpots={1:[[-4.2,-19.2],[4.2,-19.2],[-2.7,-13.8],[2.7,-13.8]],2:[[-22,-18],[22,-17],[-16,4],[18,7]],3:[[-13,-23],[13,-21],[-13,18],[13,20]],4:[[-25,-12],[24,-10],[-18,20],[20,22]]};const fixed=phaseSpots[currentMap+1]||[];for(let i=0;i<count;i++){const bot=makeBot(i);if(i<fixed.length)bot.group.position.set(fixed[i][0],0,fixed[i][1]);}spawnAllies();
  $('wave').textContent=String(count).padStart(2,'0');$('radar-count').textContent=String(count).padStart(2,'0');
  $('round-label').textContent='ROUND '+String(player.round).padStart(2,'0');
  const missions=[
@@ -753,13 +754,22 @@ function updateCampaignRoute(dt){
   spawnWave();updateHUD();toast('SECTOR '+String(player.round).padStart(2,'0')+' // OPERAÇÃO CONTINUA');return;
  }
 }
+function activateFactoryPanel(){
+ if(currentMap!==2||!player.active||!player.alive)return false;
+ const panel=factoryPanels.find(p=>!p.active&&Math.hypot(camera.position.x-p.group.position.x,camera.position.z-p.group.position.z)<2.8);
+ if(!panel)return false;panel.active=true;panel.screen.material.color.setHex(0x54ff9b);panel.screen.material.emissive.setHex(0x126b36);panel.beacon.color.setHex(0x54ff9b);panel.beacon.intensity=3.2;playSound('round');keys.KeyE=false;const done=factoryPanels.filter(p=>p.active).length;toast('CONTROLE INDUSTRIAL '+done+'/3 DESATIVADO');$('objective-sub').textContent='CONTROL PANELS DISABLED // '+done+'/3';return true;
+}
 function updateMission(dt){
  if(missionDone)return;
- const remaining=getRemainingGroundHostiles();
+ let remaining=getRemainingGroundHostiles();
+ if(currentMap===1&&!forestAmbushTriggered&&remaining<=Math.max(3,Math.ceil(bots.filter(b=>b.alive&&!b.ally).length*.55))){
+  forestAmbushTriggered=true;const ambush=[[-28,24],[28,22],[-30,-8],[30,-12],[0,-30]];for(let i=0;i<ambush.length;i++){const enemy=makeBot(32+i);enemy.group.position.set(ambush[i][0],0,ambush[i][1]);enemy.health=enemy.maxHealth=115;enemy.speed=rand(1.65,2.05);enemy.fire=rand(.35,.75);}remaining=getRemainingGroundHostiles();$('wave').textContent=String(remaining).padStart(2,'0');$('radar-count').textContent=String(remaining).padStart(2,'0');$('objective-sub').textContent='AMBUSH! ENEMY REINFORCEMENTS IN THE TREE LINE';toast('JUNGLE AMBUSH // REINFORCEMENTS INCOMING');
+ }
+ const remainingNow=remaining;
  if(missionKind==='eliminate'){
-  $('objective-sub').textContent=remaining>0?'ELIMINATE HOSTILES // '+remaining+' REMAIN':'ALL HOSTILES ELIMINATED // SECTOR CLEAR';
-  if(remaining===0){unlockExitRoute();}
-  return;
+  if(remainingNow>0){$('objective-sub').textContent=remainingNow+' HOSTILES REMAINING';return;}
+  if(currentMap===2&&factoryPanels.some(p=>!p.active)){$('objective-sub').textContent='DISABLE FACTORY CONTROL PANELS // '+factoryPanels.filter(p=>p.active).length+'/3';return;}
+  $('objective-sub').textContent='SECTOR CLEAR // EXTRACTION UNLOCKED';unlockExitRoute();return;
  }
  if(remaining===0){$('objective-sub').textContent='ALL GROUND HOSTILES ELIMINATED // SECTOR CLEAR';unlockExitRoute();return;}
  $('objective-sub').textContent='ELIMINATE GROUND HOSTILES // '+remaining+' REMAIN';
@@ -1176,6 +1186,7 @@ function update(dt){
     move.normalize();const speed=(keys.ShiftLeft||keys.ShiftRight)?8.5:5.2;
     movePlayerHorizontal(move.x*speed*dt,move.z*speed*dt);bob+=dt*speed;
    }
+   if(currentMap===2&&keys.KeyE)activateFactoryPanel();
    const nearLadderGround=currentMap===0&&Math.hypot(camera.position.x-ladderPosition.x,camera.position.z-(ladderPosition.z-1.05))<2.8;
    const nearLadderRoof=currentMap===0&&onRooftop&&Math.hypot(camera.position.x-5.85,camera.position.z-ladderPosition.z)<2.1;
    if(currentMap===0&&player.onGround&&!onRooftop&&nearLadderGround)beginLadderClimb('up');

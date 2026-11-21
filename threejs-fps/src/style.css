@@ -187,3 +187,5 @@
  pointer-events:none!important;background:#071012!important;
 }
 @media(min-width:761px) and (pointer:fine){#aim-magnifier{display:none!important}}
+
+#aim-magnifier-frame{position:fixed!important;z-index:100001!important;left:39%!important;top:56%!important;width:clamp(132px,36vw,174px)!important;height:clamp(132px,36vw,174px)!important;transform:translate(-50%,-50%)!important;object-fit:contain!important;pointer-events:none!important;display:block!important}@media(min-width:761px) and (pointer:fine){#aim-magnifier-frame{display:none!important}}

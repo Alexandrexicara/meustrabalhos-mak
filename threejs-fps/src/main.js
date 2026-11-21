@@ -420,33 +420,35 @@ let aimMagnifier=null,aimMagnifierContext=null;
 if(isTouchDevice){
  aimMagnifier=document.createElement('canvas');
  aimMagnifier.id='aim-magnifier';
- aimMagnifier.width=220;aimMagnifier.height=220;
- aimMagnifier.setAttribute('aria-label','Lupa da mira: ampliação em tempo real do centro da mira');
+ aimMagnifier.width=240;aimMagnifier.height=240;
+ aimMagnifier.setAttribute('aria-label','Lupa circular da mira: zoom ao vivo do ponto central');
+ aimMagnifier.style.cssText='position:fixed!important;z-index:99999!important;left:50%!important;top:57%!important;bottom:auto!important;transform:translate(-50%,-50%)!important;width:116px!important;height:116px!important;display:none;pointer-events:none!important;border:3px solid #c5f36b!important;border-radius:50%!important;overflow:hidden!important;box-shadow:0 0 0 3px #071012,0 5px 24px #000c,0 0 18px #c5f36b55!important;background:#071012!important;';
  aimMagnifierContext=aimMagnifier.getContext('2d',{alpha:false});
  document.body.appendChild(aimMagnifier);
 }
 function drawAimMagnifier(){
  if(!aimMagnifier||!aimMagnifierContext||!renderer||!player.active||!player.alive){
-  if(aimMagnifier)aimMagnifier.classList.remove('is-visible');
+  if(aimMagnifier){aimMagnifier.classList.remove('is-visible');aimMagnifier.style.display='none';}
   return;
  }
  const source=renderer.domElement;
  const side=Math.max(48,Math.min(source.width,source.height)*.34);
  const sx=(source.width-side)*.5,sy=(source.height-side)*.5;
  try{
-  aimMagnifierContext.clearRect(0,0,220,220);
+  aimMagnifierContext.clearRect(0,0,240,240);
   aimMagnifierContext.save();
-  aimMagnifierContext.beginPath();aimMagnifierContext.arc(110,110,108,0,Math.PI*2);aimMagnifierContext.clip();
+  aimMagnifierContext.beginPath();aimMagnifierContext.arc(120,120,118,0,Math.PI*2);aimMagnifierContext.clip();
   aimMagnifierContext.imageSmoothingEnabled=true;
   aimMagnifierContext.imageSmoothingQuality='high';
-  aimMagnifierContext.drawImage(source,sx,sy,side,side,0,0,220,220);
+  aimMagnifierContext.drawImage(source,sx,sy,side,side,0,0,240,240);
   aimMagnifierContext.restore();
-  // Fine reticle marks the exact center of the enlarged image.
-  aimMagnifierContext.strokeStyle='rgba(197,243,107,.9)';
-  aimMagnifierContext.lineWidth=1.5;
-  aimMagnifierContext.beginPath();aimMagnifierContext.moveTo(100,110);aimMagnifierContext.lineTo(120,110);aimMagnifierContext.moveTo(110,100);aimMagnifierContext.lineTo(110,120);aimMagnifierContext.stroke();
+  // Center crosshair corresponds exactly to the live camera aim point.
+  aimMagnifierContext.strokeStyle='rgba(197,243,107,.98)';
+  aimMagnifierContext.lineWidth=2;
+  aimMagnifierContext.beginPath();aimMagnifierContext.moveTo(106,120);aimMagnifierContext.lineTo(134,120);aimMagnifierContext.moveTo(120,106);aimMagnifierContext.lineTo(120,134);aimMagnifierContext.stroke();
   aimMagnifier.classList.add('is-visible');
- }catch(error){console.warn('Aim magnifier frame skipped:',error);}
+  aimMagnifier.style.display='block';
+ }catch(error){aimMagnifier.style.display='none';console.warn('Aim magnifier frame skipped:',error);}
 }
 let mobileLastTap={region:'',time:0,x:0,y:0};
 const $=id=>document.getElementById(id);

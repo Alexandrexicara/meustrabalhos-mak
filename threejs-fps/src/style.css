@@ -188,3 +188,14 @@
 @media(max-width:420px){
  #aim-magnifier{width:98px;height:98px;bottom:clamp(108px,17vh,145px);border-width:2px}
 }
+
+
+/* Final visibility override: touch devices can report a fine primary pointer.
+   The magnifier is only created by main.js on touch-capable devices, so never
+   hide it merely because the primary pointer media query says "fine". */
+#aim-magnifier.is-visible{
+ display:block!important;
+ visibility:visible!important;
+ opacity:1!important;
+ z-index:99999!important;
+}

@@ -16,7 +16,7 @@ let renderer = null;
 const lowPowerDevice = window.matchMedia('(pointer: coarse)').matches || (navigator.hardwareConcurrency || 4) <= 4;
 const renderPixelRatio = Math.min(window.devicePixelRatio || 1, lowPowerDevice ? 0.72 : 1.0);
 try {
- renderer = new THREE.WebGLRenderer({ canvas, antialias: false, alpha: false, powerPreference: 'low-power', preserveDrawingBuffer: false, failIfMajorPerformanceCaveat: false });
+ renderer = new THREE.WebGLRenderer({ canvas, antialias: false, alpha: false, powerPreference: 'low-power', preserveDrawingBuffer: true, failIfMajorPerformanceCaveat: false });
 } catch (error) {
  console.error('WebGL2 initialization failed:', error);
  canvas.style.display = 'none';
@@ -447,7 +447,7 @@ function drawAimMagnifier(){
  }
  aimMagnifier.style.visibility='visible';
  const source=renderer.domElement;
- const side=Math.max(64,Math.min(source.width,source.height)*.23);
+ const side=Math.max(48,Math.min(source.width,source.height)*.11);
  const sx=(source.width-side)*.5, sy=(source.height-side)*.5;
  try{
   aimMagnifierContext.save();
@@ -1208,6 +1208,12 @@ let radarEnemyDots=[];let radarExitDot=null;
  }
  $('clock').textContent=String(Math.floor(elapsed/60)).padStart(2,'0')+':'+String(Math.floor(elapsed%60)).padStart(2,'0');
 }
-function animate(){requestAnimationFrame(animate);if(contextLost)return;const dt=Math.min(clock.getDelta(),.15);update(dt);try{renderer.render(scene,camera);drawAimMagnifier();if(window.__tacticalMarkGameReady){window.__tacticalMarkGameReady();window.__tacticalMarkGameReady=null;}}catch(error){console.error('Render failed:',error);}}
+const performanceHud=document.createElement('div');
+performanceHud.id='tactical-performance-hud';
+performanceHud.style.cssText='position:fixed;left:10px;top:10px;z-index:100010;padding:5px 8px;border:1px solid #8ea69a66;border-radius:6px;background:#07110dcc;color:#d9f4df;font:700 10px/1.2 monospace;letter-spacing:.04em;pointer-events:none;display:none';
+performanceHud.setAttribute('aria-label','Indicador de desempenho do jogo');
+document.body.appendChild(performanceHud);
+let perfFrames=0,perfLastUpdate=performance.now(),perfPreviousFrame=0,perfFrameMs=0;
+function animate(){requestAnimationFrame(animate);if(contextLost)return;const frameNow=performance.now();if(perfPreviousFrame)perfFrameMs=frameNow-perfPreviousFrame;perfPreviousFrame=frameNow;perfFrames++;if(frameNow-perfLastUpdate>=1000){const fps=Math.round(perfFrames*1000/(frameNow-perfLastUpdate));performanceHud.textContent='FPS '+fps+'  |  '+Math.round(perfFrameMs)+' ms';performanceHud.style.display=player.active?'block':'none';performanceHud.style.color=fps<20?'#ff9b8e':fps<30?'#ffd58a':'#d9f4df';perfFrames=0;perfLastUpdate=frameNow;}const dt=Math.min(clock.getDelta(),.15);update(dt);try{renderer.render(scene,camera);drawAimMagnifier();if(window.__tacticalMarkGameReady){window.__tacticalMarkGameReady();window.__tacticalMarkGameReady=null;}}catch(error){console.error('Render failed:',error);}}
 spawnWave();updateHUD();animate();
 }

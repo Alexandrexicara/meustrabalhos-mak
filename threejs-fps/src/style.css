@@ -179,13 +179,13 @@
 /* Real round sniper optic overlay — mobile only. */
 #aim-magnifier{
  display:block!important;position:fixed!important;z-index:100000!important;
- left:39%!important;top:56%!important;width:clamp(118px,31vw,154px)!important;
- height:clamp(118px,31vw,154px)!important;transform:translate(-50%,-50%)!important;
- border:7px solid #171d1d!important;border-radius:50%!important;
+ left:auto!important;right:12px!important;top:112px!important;width:clamp(76px,20vw,92px)!important;
+ height:clamp(76px,20vw,92px)!important;transform:none!important;
+ border:4px solid #171d1d!important;border-radius:50%!important;
  clip-path:circle(50%)!important;overflow:hidden!important;
- box-shadow:0 0 0 2px #87918b,0 0 0 5px #080d0e,0 5px 22px #000e,0 0 20px #b8e56b55!important;
+ box-shadow:0 0 0 2px #87918b,0 0 0 4px #080d0e,0 3px 14px #000e,0 0 14px #b8e56b44!important;
  pointer-events:none!important;background:#071012!important;
 }
 @media(min-width:761px) and (pointer:fine){#aim-magnifier{display:none!important}}
 
-#aim-magnifier-frame{position:fixed!important;z-index:100001!important;left:39%!important;top:56%!important;width:clamp(132px,36vw,174px)!important;height:clamp(132px,36vw,174px)!important;transform:translate(-50%,-50%)!important;object-fit:contain!important;pointer-events:none!important;display:block!important}@media(min-width:761px) and (pointer:fine){#aim-magnifier-frame{display:none!important}}
+#aim-magnifier-frame{position:fixed!important;z-index:100001!important;left:auto!important;right:5px!important;top:105px!important;width:clamp(90px,24vw,106px)!important;height:clamp(90px,24vw,106px)!important;transform:none!important;object-fit:contain!important;pointer-events:none!important;display:block!important}@media(min-width:761px) and (pointer:fine){#aim-magnifier-frame{display:none!important}}

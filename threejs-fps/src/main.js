@@ -181,6 +181,16 @@ function buildMap(round){
   for(let i=0;i<22;i++){const rock=new THREE.Mesh(new THREE.DodecahedronGeometry(rand(.8,2.1),1),debris);rock.position.set(rand(-30,30),.55,rand(-30,30));rock.scale.y=.62;world.add(rock);}
   for(let i=0;i<7;i++){const trail=new THREE.Mesh(new THREE.PlaneGeometry(7,10),mat(0x514a35));trail.rotation.x=-Math.PI/2;trail.rotation.z=.18;trail.position.set(Math.sin(i*.82)*8,.015,18-i*6);world.add(trail);}
   for(const [x,z] of [[-22,-19],[21,-12],[-17,17],[24,20]]){const bush=new THREE.Mesh(new THREE.IcosahedronGeometry(2.2,1),canopies[1]);bush.position.set(x,1,z);bush.scale.set(1,.65,1.25);world.add(bush);}
+  // Elevated river pier: phase 2 has a wooden dock, not the urban rooftop.
+  const riverMat=new THREE.MeshStandardMaterial({color:0x294b4b,roughness:.28,metalness:.12});
+  const river=new THREE.Mesh(new THREE.PlaneGeometry(24,48),riverMat);river.rotation.x=-Math.PI/2;river.position.set(23,-.035,0);world.add(river);
+  const pierWood=mat(0x76583a,.94),pierMetal=mat(0x343b32,.62,.35);
+  box(22,2.22,1,16,.42,9,pierWood,true);
+  box(22,1.25,6,3,.18,11,pierWood,true);
+  for(const x of [15,19,23,27,29])for(const z of [-2,4]){const post=new THREE.Mesh(new THREE.CylinderGeometry(.2,.25,2.4,8),pierMetal);post.position.set(x,1.05,z);post.castShadow=true;world.add(post);}
+  for(const x of [14.2,29.8]){box(x,2.85,1,.16,1.05,9,pierMetal,false);}
+  // Short access ramp joins the muddy bank to the raised pier.
+  const ramp=new THREE.Mesh(new THREE.BoxGeometry(3,.22,8),pierWood);ramp.position.set(22,1.18,9.3);ramp.rotation.x=-.18;ramp.castShadow=true;world.add(ramp);
  }else if(idx===2){
   // PHASE 3: night factory — enclosed production hall, catwalks, conveyors and machinery.
   box(-18,5,0,1,10,66,wall);box(18,5,0,1,10,66,wall);box(-12,5,-32,13,10,1,wall);box(12,5,-32,13,10,1,wall);box(0,8.5,-32,11,3,1,wall);
@@ -192,6 +202,17 @@ function buildMap(round){
   for(const [x,z] of [[-12,-24],[12,-4],[-12,17],[12,27]]){const lamp=new THREE.PointLight(0xffa45c,5,17);lamp.position.set(x,7,z);world.add(lamp);const bulb=new THREE.Mesh(new THREE.SphereGeometry(.22,8,8),new THREE.MeshBasicMaterial({color:0xffc17a}));bulb.position.copy(lamp.position);world.add(bulb);}
   box(0,5.5,-4,24,.5,2.4,steel);
   for(const [x,z] of [[-12,-24],[12,0],[0,23]]){const consoleGroup=new THREE.Group();consoleGroup.position.set(x,0,z);const base=new THREE.Mesh(new THREE.BoxGeometry(1.1,1.35,.8),steel);base.position.y=.68;consoleGroup.add(base);const screen=new THREE.Mesh(new THREE.BoxGeometry(.78,.42,.08),new THREE.MeshStandardMaterial({color:0xff633d,emissive:0x5a1608,emissiveIntensity:1.1}));screen.position.set(0,1.08,-.43);consoleGroup.add(screen);const beacon=new THREE.PointLight(0xff633d,1.8,5);beacon.position.set(0,1.6,0);consoleGroup.add(beacon);world.add(consoleGroup);factoryPanels.push({group:consoleGroup,screen,beacon,active:false});}
+  // Phase 3 elevated security booth: a distinct factory guard post above the floor.
+  const guardSteel=mat(0x3b4549,.48,.62),guardGlass=mat(0x6f9294,.24,.42);
+  box(0,5.12,24,7,0.38,7,guardSteel,true);
+  for(const x of [-3.25,3.25])for(const z of [21,27])box(x,2.55,z,.32,5.1,.32,guardSteel,false);
+  for(const x of [-3.25,3.25])box(x,5.78,24,.16,1.15,6.8,guardSteel,false);
+  for(const z of [20.7,27.3])box(0,5.78,z,6.6,1.15,.16,guardSteel,false);
+  box(0,7.2,24,7.5,.28,7.5,guardSteel,false);
+  box(0,6.55,21.15,3.8,1.25,.12,guardGlass,false);
+  // Fixed ladder on the rear face of the booth.
+  for(const x of [-.55,.55]){const rail=new THREE.Mesh(new THREE.CylinderGeometry(.055,.055,5.2,8),guardSteel);rail.position.set(x,2.6,28);world.add(rail);}
+  for(let y=.35;y<5.1;y+=.42){const rung=new THREE.Mesh(new THREE.CylinderGeometry(.04,.04,1.1,8),guardSteel);rung.rotation.z=Math.PI/2;rung.position.set(0,y,28);world.add(rung);}
  }else if(idx===3){
   // PHASE 4: desert front — dunes, rock gullies and scattered scrub, with no tank or rooftop.
   for(let i=0;i<17;i++){const dune=new THREE.Mesh(new THREE.SphereGeometry(1,12,8),mat(i%2?0xb69a70:0x9d825e));dune.position.set(rand(-34,34),rand(.8,2.1),rand(-34,34));dune.scale.set(rand(5,11),rand(1.2,2.4),rand(4,9));world.add(dune);}
@@ -710,7 +731,7 @@ function updateAllies(dt){
 
 function spawnWave(){
  onRooftop=false;ladderClimb.active=false;for(const heli of helicopters){heli.destroyed=false;heli.group.visible=true;}for(const part of helicopterDebris){scene.remove(part.mesh);part.mesh.geometry.dispose();if(Array.isArray(part.mesh.material))part.mesh.material.forEach(m=>m.dispose());else part.mesh.material.dispose();}helicopterDebris.length=0;routeActive=false;if(routeMarker){world.remove(routeMarker);routeMarker=null;}buildMap(player.round);const phaseStart={0:[0,1.72,8],1:[0,1.72,29],2:[0,1.72,27],3:[0,1.72,29]};const start=phaseStart[currentMap]||phaseStart[0];camera.position.set(start[0],start[1],start[2]);camera.rotation.set(0,0,0);player.velocity.set(0,0,0);player.onGround=true;onRooftop=false;spawnSupplyPickups();for(const b of bots)scene.remove(b.group);bots.length=0;for(const a of allies)scene.remove(a.group);allies.length=0;
- forestAmbushTriggered=false;const count=Math.min(12+(player.round-1)*2,24);const phaseSpots={1:[[-4.2,-19.2],[4.2,-19.2],[-2.7,-13.8],[2.7,-13.8]],2:[],3:[[-13,-23],[13,-21],[-13,18],[13,20]],4:[[-25,-12],[24,-10],[-18,20],[20,22]]};const fixed=phaseSpots[currentMap+1]||[];for(let i=0;i<count;i++){const bot=makeBot(i);if(i<fixed.length)bot.group.position.set(fixed[i][0],0,fixed[i][1]);}spawnAllies();
+ forestAmbushTriggered=false;const count=Math.min(12+(player.round-1)*2,24);const phaseSpots={1:[[-4.2,4.6,-19.2],[4.2,4.6,-19.2],[-2.7,4.6,-13.8],[2.7,4.6,-13.8]],2:[[17,2.43,-1],[22,2.43,-1],[27,2.43,-1],[22,2.43,3]],3:[[-2,5.5,22],[2,5.5,22],[-2,5.5,26],[2,5.5,26]],4:[[-25,-12],[24,-10],[-18,20],[20,22]]};const fixed=phaseSpots[currentMap+1]||[];for(let i=0;i<count;i++){const bot=makeBot(i);if(i<fixed.length){bot.group.position.set(fixed[i][0],fixed[i][1]??0,fixed[i][2]??fixed[i][1]);bot.fixedElevation=(fixed[i][1]??0)>0;}}spawnAllies();
  $('wave').textContent=String(count).padStart(2,'0');$('radar-count').textContent=String(count).padStart(2,'0');
  $('round-label').textContent='ROUND '+String(player.round).padStart(2,'0');
  const missions=[
@@ -1140,7 +1161,7 @@ function hasClearShot(origin,target){
   // and it stops at a safe firing distance instead of charging the player as a mob.
   b.strafeTimer=Math.max(0,(b.strafeTimer||0)-dt);
   let moveX=0,moveZ=0,moved=false;
-  const assault=currentMap===1?(i%2===0):currentMap===2?(i%6===0):currentMap===3?(i%7===0):(i%5===0);
+  const assault=!b.fixedElevation&&(currentMap===1?(i%2===0):currentMap===2?(i%6===0):currentMap===3?(i%7===0):(i%5===0));
   if(assault&&dist>13&&dist<28&&b.strafeTimer<=0){
    const side=b.strafe*(Math.random()<.5?1:-1);
    const forward=Math.min(.28,Math.max(0,(dist-13)/dist));

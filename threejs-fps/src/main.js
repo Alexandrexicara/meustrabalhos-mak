@@ -220,10 +220,43 @@ function buildMap(round){
   for(let i=0;i<12;i++){const x=rand(-31,31),z=rand(-31,31),trunk=new THREE.Mesh(new THREE.CylinderGeometry(.2,.32,3.6,7),mat(0x5c4932));trunk.position.set(x,1.8,z);world.add(trunk);const crown=new THREE.Mesh(new THREE.ConeGeometry(1.8,2.6,7),mat(0x52633c));crown.position.set(x,4.2,z);world.add(crown);}
   for(const x of [-22,22]){box(x,1.5,-14,7,3,8,wall);box(x*.72,1.1,14,5,2.2,5,accent);}
   for(let i=0;i<7;i++)addCrate(-15+i*5,4,1.2);
+  // Phase 4 elevated desert checkpoint: raised sandbag watch platform and signal post.
+  const sandbag=mat(0x92734f,.98),towerSteel=mat(0x4b4437,.72,.3);
+  box(-22,4.15,-14,8,.38,7,sandbag,true);
+  for(const x of [-25.5,-18.5])for(const z of [-17,-11])box(x,2.05,z,.3,4.1,.3,towerSteel,false);
+  for(const x of [-25.5,-18.5])box(x,4.65,-14,.18,.85,6.8,towerSteel,false);
+  box(-22,4.65,-17.3,7,.85,.18,towerSteel,false);
+  const dish=new THREE.Mesh(new THREE.CylinderGeometry(.1,.1,2.1,8),towerSteel);dish.position.set(-22,5.3,-14);world.add(dish);
+  const signal=new THREE.Mesh(new THREE.SphereGeometry(.22,10,8),new THREE.MeshBasicMaterial({color:0xff6a36}));signal.position.set(-22,6.45,-14);world.add(signal);
  
  }else if(idx===4){building(0,-18,31,3,8,wall);building(-16,0,3,38,8,wall);building(16,0,3,38,8,wall);box(0,8,0,34,1.1,42,steel);for(let z=-18;z<=18;z+=9)box(0,7.2,z,33,.35,.35,trim);building(-8,-12,9,8,4.2,darkConcrete);building(9,12,10,8,4.5,wall);for(let x of [-10,-4,4,10])addCrate(x,-2,1.5);
+  // Phase 5 hangar catwalk: enemies hold the overhead maintenance gantry.
+  const catwalk=mat(0x596367,.48,.66);
+  box(0,5.65,8,19,.34,4.2,catwalk,true);
+  for(const x of [-8.8,8.8])for(const z of [6.4,9.6])box(x,2.8,z,.24,5.6,.24,steel,false);
+  for(const x of [-9.2,9.2])box(x,6.25,8,.14,1.1,4.2,trim,false);
+  for(const z of [6,10])box(0,6.25,z,18.4,1.1,.14,trim,false);
+  for(let x=-7;x<=7;x+=2.8){const lamp=new THREE.PointLight(0xffc477,.65,7);lamp.position.set(x,6.8,8);world.add(lamp);}
  }else if(idx===5){for(let i=0;i<95;i++){const x=rand(-34,34),z=rand(-34,34);if(Math.hypot(x,z-8)<7)continue;const t=new THREE.Mesh(new THREE.CylinderGeometry(.22,.38,7,7),mat(0x44382b));t.position.set(x,2.5,z);world.add(t);const c=new THREE.Mesh(new THREE.ConeGeometry(2.4,5,7),mat(0x304b32));c.position.set(x,6.2,z);world.add(c);}building(-18,-20,9,7,3.8,wall);building(18,19,8,7,3.5,accent);
+  // Phase 6 forest canopy hideout: a timber platform between the trunks.
+  const treeWood=mat(0x57432e,.98),ropeMat=mat(0x8a7654);
+  box(0,6.15,0,8,.42,7,treeWood,true);
+  for(const x of [-3.4,3.4])for(const z of [-2.8,2.8]){const trunk=new THREE.Mesh(new THREE.CylinderGeometry(.42,.58,8,9),treeWood);trunk.position.set(x,3.5,z);trunk.castShadow=true;world.add(trunk);}
+  for(const x of [-3.8,3.8])box(x,6.85,0,.16,1,6.8,ropeMat,false);
+  for(const z of [-3.3,3.3])box(0,6.85,z,7.6,1,.16,ropeMat,false);
+  const canopyRoof=new THREE.Mesh(new THREE.ConeGeometry(6.1,3.2,4),mat(0x304b32));canopyRoof.position.set(0,9.0,0);canopyRoof.rotation.y=Math.PI/4;world.add(canopyRoof);
+  // Rope bridge gives this forest map a distinct elevated route.
+  const bridge=new THREE.Mesh(new THREE.BoxGeometry(3,.2,13),treeWood);bridge.position.set(7,5.7,0);bridge.rotation.z=-.06;world.add(bridge);
+  for(const x of [5.5,8.5])box(x,6.35,0,.12,1.2,12,ropeMat,false);
  }else{for(let i=0;i<48;i++){const rock=new THREE.Mesh(new THREE.DodecahedronGeometry(rand(2,5),1),debris);rock.position.set(rand(-36,36),rand(.5,2.4),rand(-36,36));rock.scale.set(1,1.4,1.25);world.add(rock);}building(-20,-17,10,9,4.5,wall);building(20,-17,10,9,4.5,wall);building(0,-27,17,7,5,darkConcrete);addTank(-11,17);}
+  // Phase 7 mountain ridge outpost: stone lookout on a raised rocky shelf.
+  const ridgeStone=mat(0x686d70,.94),ridgeMetal=mat(0x424d52,.55,.48);
+  box(0,5.45,18,12,.5,8,ridgeStone,true);
+  for(const x of [-5.5,5.5])for(const z of [15,21])box(x,2.7,z,.55,5.4,.55,ridgeStone,false);
+  for(const x of [-5.5,5.5])box(x,6.05,18,.18,1,7.8,ridgeMetal,false);
+  box(0,6.05,14.1,11,.18,.18,ridgeMetal,false);
+  const mast=new THREE.Mesh(new THREE.CylinderGeometry(.09,.14,5,8),ridgeMetal);mast.position.set(0,8.1,18);world.add(mast);
+  const flag=new THREE.Mesh(new THREE.PlaneGeometry(1.8,.8),new THREE.MeshStandardMaterial({color:0xb34c37,side:THREE.DoubleSide}));flag.position.set(.9,9.7,18);world.add(flag);
  // Large horizon silhouettes make each operation feel like a real, connected battlefield.
  const horizonMat=mat(idx===5?0x263d2b:idx===1?0x8b7658:idx===6?0x59636a:0x3b4948,.98);
  const farMat=mat(idx===5?0x1d3426:idx===1?0xa68b63:idx===6?0x68747a:0x59645d,1);
@@ -731,7 +764,7 @@ function updateAllies(dt){
 
 function spawnWave(){
  onRooftop=false;ladderClimb.active=false;for(const heli of helicopters){heli.destroyed=false;heli.group.visible=true;}for(const part of helicopterDebris){scene.remove(part.mesh);part.mesh.geometry.dispose();if(Array.isArray(part.mesh.material))part.mesh.material.forEach(m=>m.dispose());else part.mesh.material.dispose();}helicopterDebris.length=0;routeActive=false;if(routeMarker){world.remove(routeMarker);routeMarker=null;}buildMap(player.round);const phaseStart={0:[0,1.72,8],1:[0,1.72,29],2:[0,1.72,27],3:[0,1.72,29]};const start=phaseStart[currentMap]||phaseStart[0];camera.position.set(start[0],start[1],start[2]);camera.rotation.set(0,0,0);player.velocity.set(0,0,0);player.onGround=true;onRooftop=false;spawnSupplyPickups();for(const b of bots)scene.remove(b.group);bots.length=0;for(const a of allies)scene.remove(a.group);allies.length=0;
- forestAmbushTriggered=false;const count=Math.min(12+(player.round-1)*2,24);const phaseSpots={1:[[-4.2,4.6,-19.2],[4.2,4.6,-19.2],[-2.7,4.6,-13.8],[2.7,4.6,-13.8]],2:[[17,2.43,-1],[22,2.43,-1],[27,2.43,-1],[22,2.43,3]],3:[[-2,5.31,22],[2,5.31,22],[-2,5.31,26],[2,5.31,26]],4:[[-25,-12],[24,-10],[-18,20],[20,22]]};const fixed=phaseSpots[currentMap+1]||[];for(let i=0;i<count;i++){const bot=makeBot(i);if(i<fixed.length){bot.group.position.set(fixed[i][0],fixed[i][1]??0,fixed[i][2]??fixed[i][1]);bot.fixedElevation=(fixed[i][1]??0)>0;}}spawnAllies();
+ forestAmbushTriggered=false;const count=Math.min(12+(player.round-1)*2,24);const phaseSpots={1:[[-4.2,4.6,-19.2],[4.2,4.6,-19.2],[-2.7,4.6,-13.8],[2.7,4.6,-13.8]],2:[[17,2.43,-1],[22,2.43,-1],[27,2.43,-1],[22,2.43,3]],3:[[-2,5.31,22],[2,5.31,22],[-2,5.31,26],[2,5.31,26]],4:[[-24,4.34,-14],[-21,4.34,-14],[-24,4.34,-12],[-21,4.34,-12]],5:[[-7,5.84,8],[-2.5,5.84,8],[2.5,5.84,8],[7,5.84,8]],6:[[-2.5,6.36,-2],[2.5,6.36,-2],[-2.5,6.36,2],[2.5,6.36,2]],7:[[-3,5.71,16],[3,5.71,16],[-3,5.71,20],[3,5.71,20]]};const fixed=phaseSpots[currentMap+1]||[];for(let i=0;i<count;i++){const bot=makeBot(i);if(i<fixed.length){bot.group.position.set(fixed[i][0],fixed[i][1]??0,fixed[i][2]??fixed[i][1]);bot.fixedElevation=(fixed[i][1]??0)>0;}}spawnAllies();
  $('wave').textContent=String(count).padStart(2,'0');$('radar-count').textContent=String(count).padStart(2,'0');
  $('round-label').textContent='ROUND '+String(player.round).padStart(2,'0');
  const missions=[

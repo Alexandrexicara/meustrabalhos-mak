@@ -53,6 +53,28 @@ const concrete = mat(0x66716c), darkConcrete = mat(0x3b4948), sand = mat(0x9a927
 // Mission maps: three distinct environments built as real 3D geometry.
 const world=new THREE.Group();scene.add(world);
 const colliders=[];const destructibleCrates=[];const crateDebris=[];
+const swingingBridges=[],ziplineRoutes=[];
+function addRopeLadder(x,z,height,side=1,material=mat(0x806846,.92)){
+ const group=new THREE.Group();group.position.set(x,0,z);group.rotation.y=side<0?Math.PI:0;
+ for(const dx of [-.52,.52]){const rope=new THREE.Mesh(new THREE.CylinderGeometry(.055,.055,height,8),material);rope.position.set(dx,height/2,0);group.add(rope);}
+ for(let y=.28;y<height-.12;y+=.38){const rung=new THREE.Mesh(new THREE.CylinderGeometry(.045,.045,1.08,8),mat(0x9a8058));rung.rotation.z=Math.PI/2;rung.position.set(0,y,0);group.add(rung);}
+ world.add(group);return group;
+}
+function addSuspensionBridge(x,z,length=12,width=3,axis='z',material=mat(0x705437,.95)){
+ const g=new THREE.Group(),count=Math.max(8,Math.floor(length/1.05));
+ for(let i=0;i<count;i++){const p=new THREE.Mesh(new THREE.BoxGeometry(axis==='z'?width:.9,.18,axis==='z'?.9:width),material);const t=(i/(count-1)-.5)*length;p.position.set(axis==='z'?0:t,.12+Math.sin(i/(count-1)*Math.PI)*-.22,axis==='z'?t:0);p.castShadow=true;p.receiveShadow=true;g.add(p);}
+ const ropeMat=mat(0x9a8058,.9);
+ for(const side of [-1,1]){const points=[];for(let i=0;i<=12;i++){const t=(i/12-.5)*length;points.push(new THREE.Vector3(axis==='z'?side*(width*.48):t,1.05-Math.sin(i/12*Math.PI)*.48,axis==='z'?t:side*(width*.48)));}const curve=new THREE.CatmullRomCurve3(points);g.add(new THREE.Mesh(new THREE.TubeGeometry(curve,24,.055,7,false),ropeMat));for(const t of [-length/2,length/2]){const post=new THREE.Mesh(new THREE.CylinderGeometry(.12,.16,2.1,8),mat(0x51412f));post.position.set(axis==='z'?side*(width*.48):t,1,axis==='z'?t:side*(width*.48));g.add(post);}}
+ g.position.set(x,0,z);world.add(g);swingingBridges.push({group:g,axis,phase:Math.random()*Math.PI*2});return g;
+}
+function addZipline(x1,y1,z1,x2,y2,z2){
+ const a=new THREE.Vector3(x1,y1,z1),b=new THREE.Vector3(x2,y2,z2),curve=new THREE.LineCurve3(a,b);
+ const cable=new THREE.Mesh(new THREE.TubeGeometry(curve,24,.045,7,false),mat(0x303a3c,.45,.7));world.add(cable);
+ const trolley=new THREE.Group();const wheel=new THREE.Mesh(new THREE.TorusGeometry(.16,.045,7,12),mat(0x303a3c,.35,.8));wheel.rotation.x=Math.PI/2;trolley.add(wheel);
+ const handle=new THREE.Mesh(new THREE.CylinderGeometry(.035,.035,.75,8),mat(0x9b8054));handle.position.y=-.48;trolley.add(handle);world.add(trolley);
+ ziplineRoutes.push({start:a,end:b,trolley});return ziplineRoutes[ziplineRoutes.length-1];
+}
+
 function box(x,y,z,sx,sy,sz,material,collide=true){
  const m=new THREE.Mesh(new THREE.BoxGeometry(sx,sy,sz),material);m.position.set(x,y,z);m.castShadow=true;m.receiveShadow=true;world.add(m);
  if(collide)colliders.push({x,z,hx:sx/2,hz:sz/2,top:y+sy/2,bottom:y-sy/2});return m;
@@ -158,7 +180,7 @@ function buildMap(round){
  const idx=previewPhase>=0?previewPhase:(round-1)%mapThemes.length,theme=mapThemes[idx];currentMap=idx;
  for(const shell of tankShells)scene.remove(shell.mesh);tankShells.length=0;surfaceImpacts.length=0;
  world.clear();
- colliders.length=0;destructibleCrates.length=0;crateDebris.length=0;combatVehicles.length=0;factoryPanels.length=0;
+ colliders.length=0;destructibleCrates.length=0;crateDebris.length=0;combatVehicles.length=0;factoryPanels.length=0;swingingBridges.length=0;ziplineRoutes.length=0;
  scene.background=new THREE.Color(theme.sky);scene.fog=new THREE.Fog(theme.fog,34,132);ambientLight.intensity=idx===2?.42:2.0;sun.intensity=idx===2?.38:2.8;sun.color.setHex(idx===2?0x7d91b8:0xffe4bd);renderer.toneMappingExposure=idx===2?.82:1.12;
  const floorCanvas=document.createElement('canvas');floorCanvas.width=floorCanvas.height=512;
  const ctx=floorCanvas.getContext('2d');ctx.fillStyle='#'+theme.ground.toString(16).padStart(6,'0');ctx.fillRect(0,0,512,512);
@@ -191,6 +213,7 @@ function buildMap(round){
   for(const x of [14.2,29.8]){box(x,2.85,1,.16,1.05,9,pierMetal,false);}
   // Short access ramp joins the muddy bank to the raised pier.
   const ramp=new THREE.Mesh(new THREE.BoxGeometry(3,.22,8),pierWood);ramp.position.set(22,1.18,9.3);ramp.rotation.x=-.18;ramp.castShadow=true;world.add(ramp);
+   addRopeLadder(30.1,1,2.8,-1,pierMetal);addSuspensionBridge(22,13,10,2.8,'z',pierWood);
  }else if(idx===2){
   // PHASE 3: night factory — enclosed production hall, catwalks, conveyors and machinery.
   box(-18,5,0,1,10,66,wall);box(18,5,0,1,10,66,wall);box(-12,5,-32,13,10,1,wall);box(12,5,-32,13,10,1,wall);box(0,8.5,-32,11,3,1,wall);
@@ -213,6 +236,7 @@ function buildMap(round){
   // Fixed ladder on the rear face of the booth.
   for(const x of [-.55,.55]){const rail=new THREE.Mesh(new THREE.CylinderGeometry(.055,.055,5.2,8),guardSteel);rail.position.set(x,2.6,28);world.add(rail);}
   for(let y=.35;y<5.1;y+=.42){const rung=new THREE.Mesh(new THREE.CylinderGeometry(.04,.04,1.1,8),guardSteel);rung.rotation.z=Math.PI/2;rung.position.set(0,y,28);world.add(rung);}
+  addRopeLadder(0,28.15,5.25,1,guardSteel);addSuspensionBridge(0,16.5,8,2.2,'z',guardSteel);
  }else if(idx===3){
   // PHASE 4: desert front — dunes, rock gullies and scattered scrub, with no tank or rooftop.
   for(let i=0;i<17;i++){const dune=new THREE.Mesh(new THREE.SphereGeometry(1,12,8),mat(i%2?0xb69a70:0x9d825e));dune.position.set(rand(-34,34),rand(.8,2.1),rand(-34,34));dune.scale.set(rand(5,11),rand(1.2,2.4),rand(4,9));world.add(dune);}
@@ -228,7 +252,7 @@ function buildMap(round){
   box(-22,4.65,-17.3,7,.85,.18,towerSteel,false);
   const dish=new THREE.Mesh(new THREE.CylinderGeometry(.1,.1,2.1,8),towerSteel);dish.position.set(-22,5.3,-14);world.add(dish);
   const signal=new THREE.Mesh(new THREE.SphereGeometry(.22,10,8),new THREE.MeshBasicMaterial({color:0xff6a36}));signal.position.set(-22,6.45,-14);world.add(signal);
- 
+   addRopeLadder(-26.2,-14,4.3,1,towerSteel);addSuspensionBridge(-22,-7.8,9,2.4,'z',sandbag);
  }else if(idx===4){building(0,-18,31,3,8,wall);building(-16,0,3,38,8,wall);building(16,0,3,38,8,wall);box(0,8,0,34,1.1,42,steel);for(let z=-18;z<=18;z+=9)box(0,7.2,z,33,.35,.35,trim);building(-8,-12,9,8,4.2,darkConcrete);building(9,12,10,8,4.5,wall);for(let x of [-10,-4,4,10])addCrate(x,-2,1.5);
   // Phase 5 hangar catwalk: enemies hold the overhead maintenance gantry.
   const catwalk=mat(0x596367,.48,.66);
@@ -236,7 +260,7 @@ function buildMap(round){
   for(const x of [-8.8,8.8])for(const z of [6.4,9.6])box(x,2.8,z,.24,5.6,.24,steel,false);
   for(const x of [-9.2,9.2])box(x,6.25,8,.14,1.1,4.2,trim,false);
   for(const z of [6,10])box(0,6.25,z,18.4,1.1,.14,trim,false);
-  for(let x=-7;x<=7;x+=2.8){const lamp=new THREE.PointLight(0xffc477,.65,7);lamp.position.set(x,6.8,8);world.add(lamp);}
+  for(let x=-7;x<=7;x+=2.8){const lamp=new THREE.PointLight(0xffc477,.65,7);lamp.position.set(x,6.8,8);world.add(lamp);}addRopeLadder(9.5,8,5.8,1,catwalk);addSuspensionBridge(0,13.2,9,2.6,'z',catwalk);
  }else if(idx===5){for(let i=0;i<95;i++){const x=rand(-34,34),z=rand(-34,34);if(Math.hypot(x,z-8)<7)continue;const t=new THREE.Mesh(new THREE.CylinderGeometry(.22,.38,7,7),mat(0x44382b));t.position.set(x,2.5,z);world.add(t);const c=new THREE.Mesh(new THREE.ConeGeometry(2.4,5,7),mat(0x304b32));c.position.set(x,6.2,z);world.add(c);}building(-18,-20,9,7,3.8,wall);building(18,19,8,7,3.5,accent);
   // Phase 6 forest canopy hideout: a timber platform between the trunks.
   const treeWood=mat(0x57432e,.98),ropeMat=mat(0x8a7654);
@@ -247,7 +271,7 @@ function buildMap(round){
   const canopyRoof=new THREE.Mesh(new THREE.ConeGeometry(6.1,3.2,4),mat(0x304b32));canopyRoof.position.set(0,9.0,0);canopyRoof.rotation.y=Math.PI/4;world.add(canopyRoof);
   // Rope bridge gives this forest map a distinct elevated route.
   const bridge=new THREE.Mesh(new THREE.BoxGeometry(3,.2,13),treeWood);bridge.position.set(7,5.7,0);bridge.rotation.z=-.06;world.add(bridge);
-  for(const x of [5.5,8.5])box(x,6.35,0,.12,1.2,12,ropeMat,false);
+  for(const x of [5.5,8.5])box(x,6.35,0,.12,1.2,12,ropeMat,false);addRopeLadder(9.2,0,6.5,1,ropeMat);addSuspensionBridge(10.5,0,10,2.8,'z',treeWood);
  }else{for(let i=0;i<48;i++){const rock=new THREE.Mesh(new THREE.DodecahedronGeometry(rand(2,5),1),debris);rock.position.set(rand(-36,36),rand(.5,2.4),rand(-36,36));rock.scale.set(1,1.4,1.25);world.add(rock);}building(-20,-17,10,9,4.5,wall);building(20,-17,10,9,4.5,wall);building(0,-27,17,7,5,darkConcrete);addTank(-11,17);}
   // Phase 7 mountain ridge outpost: stone lookout on a raised rocky shelf.
   const ridgeStone=mat(0x686d70,.94),ridgeMetal=mat(0x424d52,.55,.48);
@@ -255,7 +279,7 @@ function buildMap(round){
   for(const x of [-5.5,5.5])for(const z of [15,21])box(x,2.7,z,.55,5.4,.55,ridgeStone,false);
   for(const x of [-5.5,5.5])box(x,6.05,18,.18,1,7.8,ridgeMetal,false);
   box(0,6.05,14.1,11,.18,.18,ridgeMetal,false);
-  const mast=new THREE.Mesh(new THREE.CylinderGeometry(.09,.14,5,8),ridgeMetal);mast.position.set(0,8.1,18);world.add(mast);
+  const mast=new THREE.Mesh(new THREE.CylinderGeometry(.09,.14,5,8),ridgeMetal);mast.position.set(0,8.1,18);world.add(mast);addRopeLadder(6.4,22,5.8,1,ridgeMetal);addSuspensionBridge(0,25,10,2.5,'z',ridgeStone);addZipline(0,7.1,18,0,1.9,32);
   const flag=new THREE.Mesh(new THREE.PlaneGeometry(1.8,.8),new THREE.MeshStandardMaterial({color:0xb34c37,side:THREE.DoubleSide}));flag.position.set(.9,9.7,18);world.add(flag);
  // Large horizon silhouettes make each operation feel like a real, connected battlefield.
  const horizonMat=mat(idx===5?0x263d2b:idx===1?0x8b7658:idx===6?0x59636a:0x3b4948,.98);
@@ -1028,6 +1052,7 @@ function updateLadderClimb(dt){
   onRooftop=up;player.onGround=true;player.velocity.y=0;camera.position.copy(ladderClimb.end);camera.rotation.x=0;if(!up)recoverPlayerFromCollision(10);keys.KeyE=false;keys.Space=false;toast(ladderClimb.direction==='tank'?'TANQUE ALCANÇADO':up?'LAJE ALCANÇADA // ESCADA':'DESCIDA CONCLUÍDA // CHÃO');}
  return true;
 }
+function beginZiplineRide(route){ladderClimb.active=true;ladderClimb.direction='zipline';ladderClimb.time=0;ladderClimb.duration=3.1;ladderClimb.start.copy(route.start);ladderClimb.end.copy(route.end);camera.position.copy(ladderClimb.start);player.onGround=false;player.velocity.y=0;keys.KeyE=false;toast('TIROLESA // DESCENDO PARA O CAMPO...');}
 function beginTankClimb(v){ladderClimb.active=true;ladderClimb.direction='tank';ladderClimb.time=0;ladderClimb.duration=2.4;const d=new THREE.Vector3(camera.position.x-v.tank.position.x,0,camera.position.z-v.tank.position.z).normalize();ladderClimb.start.copy(camera.position);ladderClimb.end.set(v.tank.position.x+d.x*.7,4.05,v.tank.position.z+d.z*.7);camera.position.copy(ladderClimb.start);player.onGround=false;player.velocity.y=0;keys.KeyE=false;toast('SUBINDO NO TANQUE...');}
 function beginLadderClimb(direction){
  ladderClimb.active=true;ladderClimb.direction=direction;ladderClimb.time=0;ladderClimb.duration=3.8;
@@ -1244,7 +1269,7 @@ let radarEnemyDots=[];let radarExitDot=null;
     move.normalize();const speed=(keys.ShiftLeft||keys.ShiftRight)?8.5:5.2;
     movePlayerHorizontal(move.x*speed*dt,move.z*speed*dt);bob+=dt*speed;
    }
-   if(currentMap===2&&keys.KeyE)activateFactoryPanel();
+   if(currentMap===2&&keys.KeyE)activateFactoryPanel();const nearbyZipline=ziplineRoutes.find(route=>Math.hypot(camera.position.x-route.start.x,camera.position.z-route.start.z)<3.2&&camera.position.y>4.2);if(nearbyZipline&&keys.KeyE)beginZiplineRide(nearbyZipline);
    const nearLadderGround=currentMap===0&&Math.hypot(camera.position.x-ladderPosition.x,camera.position.z-(ladderPosition.z-1.05))<2.8;
    const nearLadderRoof=currentMap===0&&onRooftop&&Math.hypot(camera.position.x-5.85,camera.position.z-ladderPosition.z)<2.1;
    if(currentMap===0&&player.onGround&&!onRooftop&&nearLadderGround)beginLadderClimb('up');
@@ -1257,7 +1282,7 @@ let radarEnemyDots=[];let radarExitDot=null;
    }
   }
   weapon.position.y=Math.sin(bob*1.7)*.012-recoil*.5+(crouched?-.22:0);weapon.position.x=Math.cos(bob*.85)*.008;weapon.rotation.x=-recoil+(crouched?.035:0);operatorLegs.visible=camera.rotation.x<-.10||ladderClimb.active;operatorLegs.position.y=crouched?-.12:0;if(!ladderClimb.active)updateFirstPersonRig(dt,crouched);
-  const nearTank=currentMap===0&&!onRooftop&&combatVehicles.some(v=>Math.hypot(camera.position.x-v.tank.position.x,camera.position.z-v.tank.position.z)<4.4);const nearLadder=currentMap===0&&(onRooftop?Math.hypot(camera.position.x-5.85,camera.position.z-ladderPosition.z)<3.2:Math.hypot(camera.position.x-ladderPosition.x,camera.position.z-(ladderPosition.z-1.05))<3.5);if(keys.KeyE&&!nearLadder&&!nearTank)keys.KeyE=false;if(isTouchDevice){const lb=$('mobile-ladder');if(lb){const nearPanel=currentMap===2&&factoryPanels.some(p=>!p.active&&Math.hypot(camera.position.x-p.group.position.x,camera.position.z-p.group.position.z)<2.8);lb.style.display=ladderClimb.active?'block':nearLadder||nearTank||nearPanel?'block':'none';lb.textContent=ladderClimb.active?(ladderClimb.direction==='up'?'SUBINDO...':ladderClimb.direction==='tank'?'SUBINDO NO TANQUE...':'DESCENDO...'):nearPanel?'DESATIVAR PAINEL':nearTank?'SUBIR NO TANQUE':onRooftop?'DESCER ESCADA':'SUBIR ESCADA';}}updateAutomaticWeapon();updateBots(dt);updateAllies(dt);updateProjectiles(dt);for(const p of supplyPickups){p.phase+=dt*1.8;p.icon.position.y=p.baseY+Math.sin(p.phase)*.09;p.label.position.y=.72+Math.sin(p.phase)*.09;}collectSupplyPickups();updateMission(dt);updateCampaignRoute(dt);
+  const nearTank=currentMap===0&&!onRooftop&&combatVehicles.some(v=>Math.hypot(camera.position.x-v.tank.position.x,camera.position.z-v.tank.position.z)<4.4);const nearZipline=ziplineRoutes.some(route=>Math.hypot(camera.position.x-route.start.x,camera.position.z-route.start.z)<3.2&&camera.position.y>4.2);const nearLadder=currentMap===0&&(onRooftop?Math.hypot(camera.position.x-5.85,camera.position.z-ladderPosition.z)<3.2:Math.hypot(camera.position.x-ladderPosition.x,camera.position.z-(ladderPosition.z-1.05))<3.5);if(keys.KeyE&&!nearLadder&&!nearTank&&!nearZipline)keys.KeyE=false;if(isTouchDevice){const lb=$('mobile-ladder');if(lb){const nearPanel=currentMap===2&&factoryPanels.some(p=>!p.active&&Math.hypot(camera.position.x-p.group.position.x,camera.position.z-p.group.position.z)<2.8);lb.style.display=ladderClimb.active?'block':nearLadder||nearTank||nearPanel||nearZipline?'block':'none';lb.textContent=ladderClimb.active?(ladderClimb.direction==='up'?'SUBINDO...':ladderClimb.direction==='tank'?'SUBINDO NO TANQUE...':'DESCENDO...'):nearPanel?'DESATIVAR PAINEL':nearZipline?'USAR TIROLESA':nearTank?'SUBIR NO TANQUE':onRooftop?'DESCER ESCADA':'SUBIR ESCADA';}}updateAutomaticWeapon();updateBots(dt);updateAllies(dt);updateProjectiles(dt);for(const p of supplyPickups){p.phase+=dt*1.8;p.icon.position.y=p.baseY+Math.sin(p.phase)*.09;p.label.position.y=.72+Math.sin(p.phase)*.09;}collectSupplyPickups();updateMission(dt);updateCampaignRoute(dt);
   if(Math.floor(elapsed*3)%2===0)updateRadar();
  }
  $('clock').textContent=String(Math.floor(elapsed/60)).padStart(2,'0')+':'+String(Math.floor(elapsed%60)).padStart(2,'0');
@@ -1268,6 +1293,6 @@ performanceHud.style.cssText='position:fixed;left:10px;top:10px;z-index:100010;p
 performanceHud.setAttribute('aria-label','Indicador de desempenho do jogo');
 document.body.appendChild(performanceHud);
 let perfFrames=0,perfLastUpdate=performance.now(),perfPreviousFrame=0,perfFrameMs=0;
-function animate(){requestAnimationFrame(animate);if(contextLost)return;const frameNow=performance.now();if(perfPreviousFrame)perfFrameMs=frameNow-perfPreviousFrame;perfPreviousFrame=frameNow;perfFrames++;if(frameNow-perfLastUpdate>=1000){const fps=Math.round(perfFrames*1000/(frameNow-perfLastUpdate));performanceHud.textContent='FPS '+fps+'  |  '+Math.round(perfFrameMs)+' ms';performanceHud.style.display=player.active?'block':'none';performanceHud.style.color=fps<20?'#ff9b8e':fps<30?'#ffd58a':'#d9f4df';perfFrames=0;perfLastUpdate=frameNow;}const dt=Math.min(clock.getDelta(),.15);update(dt);try{renderer.render(scene,camera);drawAimMagnifier();if(window.__tacticalMarkGameReady){window.__tacticalMarkGameReady();window.__tacticalMarkGameReady=null;}}catch(error){console.error('Render failed:',error);}}
+function animate(){requestAnimationFrame(animate);if(contextLost)return;const frameNow=performance.now();if(perfPreviousFrame)perfFrameMs=frameNow-perfPreviousFrame;perfPreviousFrame=frameNow;perfFrames++;if(frameNow-perfLastUpdate>=1000){const fps=Math.round(perfFrames*1000/(frameNow-perfLastUpdate));performanceHud.textContent='FPS '+fps+'  |  '+Math.round(perfFrameMs)+' ms';performanceHud.style.display=player.active?'block':'none';performanceHud.style.color=fps<20?'#ff9b8e':fps<30?'#ffd58a':'#d9f4df';perfFrames=0;perfLastUpdate=frameNow;}const dt=Math.min(clock.getDelta(),.15);update(dt);for(const bridge of swingingBridges){const sway=Math.sin(frameNow*.0015+bridge.phase)*.018;bridge.group.rotation[bridge.axis==='z'?'x':'z']=sway;}for(const route of ziplineRoutes){const pulse=(Math.sin(frameNow*.0012)+1)*.5;route.trolley.position.lerpVectors(route.start,route.end,pulse);}try{renderer.render(scene,camera);drawAimMagnifier();if(window.__tacticalMarkGameReady){window.__tacticalMarkGameReady();window.__tacticalMarkGameReady=null;}}catch(error){console.error('Render failed:',error);}}
 spawnWave();updateHUD();animate();
 }

@@ -435,7 +435,7 @@ if(isMobileLens){
  aimMagnifier.id='aim-magnifier';
  aimMagnifier.width=240; aimMagnifier.height=240;
  aimMagnifier.setAttribute('aria-label','Lente de mira sniper com zoom ao vivo');
- aimMagnifier.style.cssText='position:fixed!important;z-index:100000!important;left:39%!important;top:56%!important;right:auto!important;bottom:auto!important;transform:translate(-50%,-50%)!important;width:clamp(118px,31vw,154px)!important;height:clamp(118px,31vw,154px)!important;display:block!important;visibility:visible!important;opacity:1!important;pointer-events:none!important;border:7px solid #171d1d!important;border-radius:50%!important;clip-path:circle(50%)!important;box-shadow:0 0 0 2px #87918b,0 0 0 5px #080d0e,0 5px 22px #000e,0 0 20px #b8e56b55!important;background:#071012!important;';
+ aimMagnifier.style.cssText='position:fixed!important;z-index:100000!important;left:auto!important;right:12px!important;top:112px!important;bottom:auto!important;transform:none!important;width:clamp(76px,20vw,92px)!important;height:clamp(76px,20vw,92px)!important;display:block!important;visibility:visible!important;opacity:1!important;pointer-events:none!important;border:4px solid #171d1d!important;border-radius:50%!important;clip-path:circle(50%)!important;box-shadow:0 0 0 2px #87918b,0 0 0 4px #080d0e,0 3px 14px #000e,0 0 14px #b8e56b44!important;background:#071012!important;';
  aimMagnifierContext=aimMagnifier.getContext('2d',{alpha:false});
  document.body.appendChild(aimMagnifier);aimMagnifierFrame=document.createElement('img');aimMagnifierFrame.id='aim-magnifier-frame';aimMagnifierFrame.src='/assets/sniper-optic-frame.svg';aimMagnifierFrame.alt='';aimMagnifierFrame.setAttribute('aria-hidden','true');document.body.appendChild(aimMagnifierFrame);
 }
@@ -1075,18 +1075,18 @@ if(isTouchDevice){
  const stopLook=e=>{if(e.pointerId!==lookPointer)return;
   if(!lookMoved&&player.active&&player.alive){
    const x=e.clientX,y=e.clientY;
-   const armPoints=projectTapPoints(leftArmRig,[[.88,.20,-.78],[.40,.16,-.50],[.67,.17,-.61]]);
+   const armPoints=[...projectTapPoints(leftArmRig,[[0,0,0],[.40,.16,-.50],[.67,.17,-.61],[.88,.18,-.72],[.88,.20,-.78]]),...projectTapPoints(rightArmRig,[[0,0,0],[-.24,.16,-.52],[-.28,.16,-.68],[-.28,.18,-.74]])];
    const activeGun=player.weaponType==='pistol'?pistol:player.weaponType==='launcher'?launcher:weapon;
    const gunLocals=player.weaponType==='pistol'?[[.34,-.31,-.55],[.34,-.4,-.5]]:player.weaponType==='launcher'?[[.34,-.25,-.8],[.34,-.25,-1.325]]:[[.34,-.27,-.78],[.34,-.22,-1.38],[.34,-.22,-1.64]];
    const gunPoints=projectTapPoints(activeGun,gunLocals);
    const nearest=points=>Math.min(...points.map(p=>Math.hypot(x-p.x,y-p.y)));
-   const armDistance=nearest(armPoints),gunDistance=nearest(gunPoints),hitRadius=Math.max(52,Math.min(82,innerWidth*.19));
+   const armDistance=nearest(armPoints),gunDistance=nearest(gunPoints),hitRadius=Math.max(52,Math.min(82,innerWidth*.19)),armHitRadius=Math.max(72,Math.min(112,innerWidth*.26));
    // Classifica pelo objeto realmente tocado: arma e braço têm áreas independentes.
    let region='';
    if(gunDistance<=hitRadius&&gunDistance<armDistance)region='weapon';
-   else if(armDistance<=hitRadius)region='hand';
+   else if(armDistance<=armHitRadius)region='hand';
    if(region){
-    const now=performance.now(),same=mobileLastTap.region===region&&now-mobileLastTap.time<650&&Math.hypot(x-mobileLastTap.x,y-mobileLastTap.y)<Math.max(48,innerWidth*.12);
+    const now=performance.now(),same=mobileLastTap.region===region&&now-mobileLastTap.time<800&&Math.hypot(x-mobileLastTap.x,y-mobileLastTap.y)<Math.max(60,innerWidth*.15);
     if(same){if(region==='weapon')shoot();else throwGrenade();mobileLastTap={region:'',time:0,x:0,y:0};}
     else mobileLastTap={region,time:now,x,y};
    }else mobileLastTap={region:'',time:0,x:0,y:0};
